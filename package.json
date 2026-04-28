@@ -1,18 +1,28 @@
 {
   "name": "eslint-plugin-templates",
-  "version": "0.0.0",
-  "description": "ESLint plugin for template-based linting rules.",
-  "main": "index.js",
+  "version": "0.1.0-dev",
+  "description": "ESLint plugin that enforces structural conformance of files against declarative templates.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "files": [
-    "index.js",
+    "dist",
     "LICENSE",
     "README.md"
   ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "prepublishOnly": "npm run build"
+  },
   "keywords": [
     "eslint",
     "eslintplugin",
     "eslint-plugin",
-    "templates"
+    "templates",
+    "structural-linting",
+    "ast"
   ],
   "author": "Terry Tsai <ttsai0509@gmail.com>",
   "license": "MIT",
@@ -26,6 +36,18 @@
   "homepage": "https://github.com/TerryTsai/eslint-plugin-templates#readme",
   "peerDependencies": {
     "eslint": ">=8"
+  },
+  "dependencies": {
+    "@typescript-eslint/typescript-estree": "^8.0.0",
+    "@typescript-eslint/utils": "^8.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@typescript-eslint/parser": "^8.0.0",
+    "@typescript-eslint/rule-tester": "^8.0.0",
+    "eslint": "^9.0.0",
+    "typescript": "^5.6.0",
+    "vitest": "^2.0.0"
   },
   "engines": {
     "node": ">=18"
