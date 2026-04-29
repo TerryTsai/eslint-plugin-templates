@@ -21,6 +21,12 @@ interface ConsumeState {
   nextIndex: number;
 }
 
+/**
+ * Greedily match file nodes against the named slot up to `maxOccurs`,
+ * then check the count meets `minOccurs`. On insufficient matches, prefers
+ * a `refinementFailed` diagnostic (if a candidate failed only on refinement)
+ * over the more generic `missingRequired`.
+ */
 export function consumePlaceholder(
   name: string,
   slots: Record<string, Slot>,

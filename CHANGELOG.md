@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.2.0
+
+New `eslint-plugin-templates/config` subpath for describing whole-folder layouts as reusable modules.
+
+- `defineModule({ contents, closed? })` — declarative tree of file and folder entries. Folder keys end with `/` and take a nested tree (or another `defineModule` for folder-local options); file keys take a `MatchTemplate`. Multi-segment keys and `**` are rejected statically (template literal types) and at runtime.
+- `applyModule({ module, root, parser, parserOptions? })` — expands a module into ESLint flat-config blocks rooted at the given path. Sibling globs auto-sort by specificity (most-specific wins via ESLint's last-match semantics). `closed: true | { message, extensions }` emits a `templates/forbid` block per folder.
+- Modules are pure data — define once, apply at multiple roots.
+- Reference: [docs/modules.md](./docs/modules.md). README "Modules" section walks through a microservice resource example.
+
 ## 0.1.2
 
 Internal cleanup. No public API or behavior changes.

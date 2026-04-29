@@ -11,6 +11,62 @@ The template body is parsed once per template object. For each file ESLint hands
 
 The match is whole-file. Anything in the file not accounted for by the template fails the lint.
 
+## Body composition
+
+The `body` is parsed as TypeScript. Anything valid in TS is valid in a body, and three building blocks combine to describe a file's shape:
+
+### Statement-level placeholders
+
+`${SLOT}` on its own line consumes one or more file statements according to the slot's `type`, cardinality, and refinements.
+
+```js
+body: "${IMPORTS}\n${EXPORTED}"
+```
+
+### Literal AST
+
+Anything that isn't a placeholder is literal — it must appear in the file with the same AST shape. Source location is ignored, but every other field is compared.
+
+```js
+body: 'import { useState } from "react";\n${HOOKS}'
+```
+
+The file must start with that exact import (wrong source path, missing or extra specifier all fail with `divergence`), then satisfy `HOOKS`.
+
+A body with no placeholders at all is valid — it requires an exact-shape file:
+
+```js
+body: "export const VERSION = '1.0.0';"
+```
+
+### Inline placeholders
+
+`${NAME}` in an expression or identifier position (anywhere other than a top-level statement) becomes a binding hole. The first occurrence accepts whatever Identifier sits there in the file; later occurrences must agree, or `bindingMismatch` fires.
+
+```js
+body: "function ${NAME}() {}\nexport { ${NAME} };"
+```
+
+`function foo() {} export { foo };` matches. `function foo() {} export { bar };` triggers `bindingMismatch`.
+
+A literal shell with an inline name placeholder lets you constrain everything *but* the name:
+
+```js
+body: "export function ${NAME}() { return null; }"
+```
+
+That requires the file to be exactly an exported function returning `null` — only the function's name varies.
+
+### Combining them
+
+Mix freely. The matcher resolves each template top-level statement as either a placeholder (treated per slot rules) or as literal AST (deep-compared, with inline placeholders unifying):
+
+```js
+body: 'import { useState } from "react";\n${HOOKS}\nexport function ${NAME}() {}'
+```
+
+Required: the exact import, one or more `HOOKS` statements, then a literal `export function () {}` shell with `${NAME}` bound to whatever the file names it.
+
 ## Configuration
 
 ```ts

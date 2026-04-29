@@ -111,5 +111,39 @@ ruleTester.run("match", rule, {
       ],
       errors: [{ messageId: "bindingMismatch" }],
     },
+    {
+      name: "literal portion of body must match exactly",
+      code: `import { useEffect } from "react";\nfunction useThing() {}`,
+      options: [
+        {
+          id: "feature",
+          body: 'import { useState } from "react";\n${HOOKS}',
+          slots: { HOOKS: { type: "FunctionDeclaration", minOccurs: 1 } },
+        },
+      ],
+      errors: [{ messageId: "divergence" }],
+    },
   ],
+});
+
+const literalTemplate: MatchTemplate = {
+  id: "feature",
+  body: 'import { useState } from "react";\n${HOOKS}',
+  slots: { HOOKS: { type: "FunctionDeclaration", minOccurs: 1, maxOccurs: 5 } },
+};
+
+ruleTester.run("match (literal text in body)", rule, {
+  valid: [
+    {
+      name: "literal import followed by hook functions",
+      code: `import { useState } from "react";\nfunction useThing() {}\nfunction useOther() {}`,
+      options: [literalTemplate],
+    },
+    {
+      name: "literal shell with an inline placeholder for the function name",
+      code: `export function widget() { return null; }`,
+      options: [{ id: "feature", body: "export function ${NAME}() { return null; }" }],
+    },
+  ],
+  invalid: [],
 });

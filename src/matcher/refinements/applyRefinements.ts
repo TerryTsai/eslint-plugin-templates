@@ -48,6 +48,11 @@ const CHECKS: Array<[keyof RefinementBag, Check]> = [
   ["matches", (n, v) => matchesLiteralValue(n, v as RegExp)],
 ];
 
+/**
+ * Run every refinement declared on `slot` against `node` and return the first
+ * failure (or `{ ok: true }`). The schema guarantees only refinements valid
+ * for the slot's variant are present.
+ */
 export function applyRefinements(node: TSESTree.Node, slot: Slot): RefinementResult {
   const bag = slot as RefinementBag;
   const wrap = unwrap(node);

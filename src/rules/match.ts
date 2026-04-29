@@ -23,12 +23,21 @@ const messages: Record<MatchMessageId, string> = {
 
 const parsedCache = new WeakMap<object, ParsedTemplate>();
 
+/**
+ * Parse the template body once per template object.
+ * ESLint reuses the same options object across files, so caching avoids
+ * reparsing for every file in the run.
+ */
 function getParsed(template: MatchTemplate): ParsedTemplate {
   let parsed = parsedCache.get(template);
   if (!parsed) parsedCache.set(template, (parsed = parseTemplate(template.body)));
   return parsed;
 }
 
+/**
+ * `templates/match` rule: for each file, parse the template body (once, cached),
+ * match the file's program against it, and report the first divergence as a diagnostic.
+ */
 export const rule = createRule<[MatchTemplate], MatchMessageId>({
   name: "match",
   meta: {

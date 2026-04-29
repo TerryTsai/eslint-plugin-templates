@@ -15,6 +15,12 @@ interface SequenceState {
   fi: number;
 }
 
+/**
+ * Walk template statements left-to-right against `fileNodes`, advancing through
+ * the file as each template node is satisfied. Placeholder statements consume
+ * per slot rules; literal template AST must match the file's next node exactly.
+ * Trailing file content fails as `extraContent`.
+ */
 export function matchSequence(
   templateNodes: readonly TSESTree.Node[],
   fileNodes: readonly TSESTree.Node[],

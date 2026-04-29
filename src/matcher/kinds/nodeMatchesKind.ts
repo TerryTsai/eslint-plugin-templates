@@ -20,6 +20,11 @@ const KIND_PREDICATES: Record<string, KindPredicate> = {
   NumericLiteral: (n) => n.type === "Literal" && typeof n.value === "number",
 };
 
+/**
+ * True when `node` matches the logical kind (or any kind in the array).
+ * Looks through `export` wrappers — `{ type: "FunctionDeclaration" }` matches
+ * both `function foo()` and `export function foo()`.
+ */
 export function nodeMatchesKind(node: TSESTree.Node, kind: NodeKind | NodeKind[]): boolean {
   const kinds = Array.isArray(kind) ? kind : [kind];
   return kinds.some((k) => matchesOneKind(node, k));

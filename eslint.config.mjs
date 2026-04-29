@@ -1,5 +1,7 @@
+import tsParser from "@typescript-eslint/parser";
+
+import { applyModule, defineModule } from "./dist/config/index.js";
 import { standardConfig } from "./eslint/builders/standardConfig.mjs";
-import { templateConfig } from "./eslint/builders/templateConfig.mjs";
 import { ignores } from "./eslint/ignores.mjs";
 import { testOverrides } from "./eslint/rules/testOverrides.mjs";
 import { builderModuleTemplate } from "./eslint/templates/builderModuleTemplate.mjs";
@@ -10,18 +12,50 @@ import { ruleFileTemplate } from "./eslint/templates/ruleFileTemplate.mjs";
 import { schemaFileTemplate } from "./eslint/templates/schemaFileTemplate.mjs";
 import { typesModuleTemplate } from "./eslint/templates/typesModuleTemplate.mjs";
 
-const TYPES_ONLY_FILES = ["src/types.ts", "src/matcher/matchResult.ts"];
+const srcModule = defineModule({
+  contents: {
+    "types.ts": typesModuleTemplate,
+    "plugin.ts": constantModuleTemplate,
+    "parsing/": { "*.ts": matcherTemplate },
+    "matcher/": {
+      "*.ts": matcherTemplate,
+      "matchResult.ts": typesModuleTemplate,
+      "kinds/": { "*.ts": matcherTemplate },
+      "refinements/": {
+        "applyRefinements.ts": matcherTemplate,
+        "checks/": { "*.ts": leafCheckTemplate },
+      },
+      "sequence/": { "*.ts": matcherTemplate },
+    },
+    "rules/": {
+      "createRule.ts": constantModuleTemplate,
+      "match.ts": ruleFileTemplate,
+      "forbid.ts": ruleFileTemplate,
+      "*.schema.ts": schemaFileTemplate,
+    },
+    "config/": {
+      "applyModule.ts": matcherTemplate,
+      "defineModule.ts": matcherTemplate,
+      "specificity.ts": matcherTemplate,
+      "validateTree.ts": matcherTemplate,
+      "types.ts": typesModuleTemplate,
+    },
+  },
+});
+
+const eslintModule = defineModule({
+  contents: {
+    "ignores.mjs": constantModuleTemplate,
+    "templates/": { "*.mjs": constantModuleTemplate },
+    "rules/": { "*.mjs": constantModuleTemplate },
+    "builders/": { "*.mjs": builderModuleTemplate },
+  },
+});
 
 export default [
   { ignores },
   standardConfig({ files: ["src/**/*.ts"] }),
-  templateConfig({ files: ["src/matcher/**/*.ts", "src/parsing/**/*.ts"], ignores: ["src/matcher/refinements/checks/**", ...TYPES_ONLY_FILES], template: matcherTemplate }),
-  templateConfig({ files: ["src/matcher/refinements/checks/*.ts"], template: leafCheckTemplate }),
-  templateConfig({ files: TYPES_ONLY_FILES, template: typesModuleTemplate }),
-  templateConfig({ files: ["src/rules/createRule.ts"], template: constantModuleTemplate }),
-  templateConfig({ files: ["src/rules/match.ts", "src/rules/forbid.ts"], template: ruleFileTemplate }),
-  templateConfig({ files: ["src/rules/*.schema.ts"], template: schemaFileTemplate }),
-  templateConfig({ files: ["eslint/templates/*.mjs", "eslint/rules/*.mjs", "eslint/ignores.mjs"], template: constantModuleTemplate }),
-  templateConfig({ files: ["eslint/builders/*.mjs"], template: builderModuleTemplate }),
+  ...applyModule({ module: srcModule, root: "src", parser: tsParser }),
+  ...applyModule({ module: eslintModule, root: "eslint", parser: tsParser }),
   standardConfig({ files: ["tests/**/*.ts"], overrides: testOverrides }),
 ];

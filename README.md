@@ -42,6 +42,28 @@ Every file in `src/handlers/` must be zero or more imports followed by one expor
 
 `body` uses `${SLOT}` placeholders for the parts that vary. Pass it as a regular string, not a JavaScript template literal — `` `${SLOT}` `` would interpolate at config-load time.
 
+## Body
+
+The `body` is parsed as TypeScript, so anything valid in TS is valid in a body. Three building blocks combine:
+
+- **Statement-level placeholders** — `${SLOT}` on its own line consumes zero or more file statements per the slot's type, cardinality, and refinements.
+- **Literal AST** — any non-placeholder code in the body must appear exactly in the file. The matcher walks the two ASTs in lockstep, ignoring source location.
+- **Inline placeholders** — `${NAME}` used in an expression or identifier position binds to whatever Identifier sits there in the file. A later `${NAME}` must agree, or `bindingMismatch` fires.
+
+A typical mix:
+
+```js
+body: 'import { useState } from "react";\n${HOOKS}\nexport function ${NAME}() {}'
+```
+
+That requires:
+
+- The exact `import { useState } from "react";` line — wrong source path or missing specifier fails with `divergence`.
+- One or more `HOOKS` statements per the slot's rules.
+- A literal `export function () {}` shell, with `${NAME}` binding to the file's actual function name.
+
+Pure-slot bodies (`${A}\n${B}\n${C}`) and pure-literal bodies (no placeholders at all, requiring an exact file) are both valid — they're just special cases of this mix.
+
 ## Rules
 
 Two rules. Templates describe what's allowed; `forbid` rejects what isn't.
@@ -225,9 +247,67 @@ export default [
 ];
 ```
 
+## Modules
+
+For codebases where many folders share a structural shape — for example, a microservice with a folder per REST resource — `eslint-plugin-templates/config` lets you describe the whole-folder layout once with `defineModule` and apply it with `applyModule`:
+
+```js
+import { applyModule, defineModule } from "eslint-plugin-templates/config";
+import tsParser from "@typescript-eslint/parser";
+
+// Every folder under src/api/ (users, posts, comments, ...) has the same shape:
+// router/controller/service/model at the top, a validation/ sub-folder with
+// its own internal structure, and colocated tests.
+const apiResourceModule = defineModule({
+  contents: {
+    "router.ts": routerTemplate,
+    "controller.ts": controllerTemplate,
+    "service.ts": serviceTemplate,
+    "model.ts": modelTemplate,
+    "validation/": defineModule({
+      closed: true,
+      contents: {
+        "schema.ts": schemaTemplate,
+        "validators/": { "*.ts": validatorTemplate },
+      },
+    }),
+    "*.test.ts": testTemplate,
+  },
+  closed: { message: "API resources contain only router, controller, service, model, validation, and tests." },
+});
+
+export default [
+  ...applyModule({ module: apiResourceModule, root: "src/api/*", parser: tsParser }),
+  // Same shape reused at another root:
+  ...applyModule({ module: apiResourceModule, root: "apps/*/api/*", parser: tsParser }),
+];
+```
+
+The example exercises most of the surface area:
+
+- **Literal file entries** (`router.ts`, `controller.ts`) for required files at known paths.
+- **File globs** (`*.test.ts`, `validators/*.ts`) for any file matching a pattern within a folder.
+- **Plain folder entries** with object values for simple sub-trees (`validators/`).
+- **Nested `defineModule`** for folder-local options — the `validation/` folder sets its own `closed: true`, separate from the top-level `closed`.
+- **`closed`** at multiple levels: top-level rejects unknown files in the resource folder; the `validation/` sub-module rejects extras in its scope.
+
+`applyModule` expands the tree into one ESLint config block per leaf entry, orders sibling globs by specificity (most-specific wins), and emits a `templates/forbid` block for the folder when `closed` is set. Modules are pure data — define once, apply at as many roots as you like.
+
+Tree conventions:
+
+- Keys ending in `/` are folders; their value is a nested tree (or another `defineModule` for folder-local options).
+- Keys without `/` are files — literal names (`"index.ts"`) or single-folder globs (`"*.ts"`, `"*.test.ts"`).
+- Multi-segment keys (`"a/b/c.ts"`) are rejected — nest folders explicitly.
+- `**` is rejected. Modules describe structure; use `templates/match` directly when you need depth-agnostic matching.
+
+`closed: true` (or `closed: { message, extensions }`) rejects any file in *that* folder not matched by a direct entry. Nested folders own their own scope. Default extensions are `["ts"]`.
+
+[Full reference →](./docs/modules.md)
+
 ## Limitations
 
-- One template per `templates/match` rule invocation. Use multiple ESLint config blocks with different `files` globs to apply different templates to different parts of the codebase.
+- One template per `templates/match` rule invocation. Use multiple ESLint config blocks (or a module) with different `files` globs to apply different templates to different parts of the codebase.
+- Modules enforce upper bounds (forbid extras when `closed`) but not lower bounds — ESLint can't require a file that isn't there.
 - No autofix.
 - No type-resolved checks; everything is syntactic.
 - `templates/forbid` only sees files ESLint lints. To catch non-JS/TS files (`*.md`, `*.json`, etc.), extend ESLint's parser configuration to those file types.

@@ -6,6 +6,12 @@ const LOCATION_KEYS: ReadonlySet<string> = new Set(["loc", "range", "start", "en
 
 type ObjectLike = Record<string, unknown>;
 
+/**
+ * Deep structural comparison of two AST nodes, ignoring source location.
+ * Inline `${NAME}` Identifiers in `a` unify with whatever Identifier appears
+ * in the same position in `b`, with later occurrences required to agree
+ * (recorded via `ctx`).
+ */
 export function structurallyEqual(a: unknown, b: unknown, ctx: BindingContext): boolean {
   if (a === b) return true;
   if (notSameObjectShape(a, b)) return false;

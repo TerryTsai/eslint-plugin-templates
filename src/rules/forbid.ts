@@ -3,6 +3,10 @@ import { forbidRuleSchema } from "./forbid.schema";
 
 export type ForbidMessageId = "forbidden";
 
+/**
+ * Options for `templates/forbid`.
+ * The optional `message` becomes the diagnostic text.
+ */
 export interface ForbidOptions {
   message?: string;
 }
@@ -13,6 +17,10 @@ const messages: Record<ForbidMessageId, string> = {
   forbidden: "{{message}}",
 };
 
+/**
+ * `templates/forbid` rule: emits a diagnostic on every file ESLint hands it.
+ * Pair with ESLint's `ignores` to allow-list specific files.
+ */
 export const rule = createRule<[ForbidOptions], ForbidMessageId>({
   name: "forbid",
   meta: {

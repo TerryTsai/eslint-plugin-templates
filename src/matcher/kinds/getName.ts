@@ -1,5 +1,10 @@
 import { type TSESTree } from "@typescript-eslint/typescript-estree";
 
+/**
+ * Extract the identifier name a node introduces — for declarations
+ * (function/class), single-binding `const`s, and properties.
+ * Returns `null` for nodes without an identifying name.
+ */
 export function getName(node: TSESTree.Node): string | null {
   return nameFromId(node) ?? nameFromDeclarations(node) ?? nameFromKey(node);
 }

@@ -1,5 +1,5 @@
 export const sharedRules = {
-  "max-len": ["error", { code: 140, ignoreUrls: true, ignoreRegExpLiterals: true, ignoreStrings: true, ignoreTemplateLiterals: true }],
+  "max-len": ["error", { code: 140, ignoreUrls: true, ignoreRegExpLiterals: true, ignoreStrings: true, ignoreTemplateLiterals: true, ignoreComments: true }],
   "max-lines": ["error", { max: 100, skipBlankLines: true, skipComments: true }],
   "max-lines-per-function": ["error", { max: 20, skipBlankLines: true, skipComments: true }],
   "max-depth": ["error", 2],

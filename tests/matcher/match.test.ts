@@ -122,4 +122,62 @@ describe("matchProgram", () => {
       expect(result.error.data["got"]).toBe("goodbye");
     }
   });
+
+  it("matches a literal-only template against an exact file", () => {
+    const tpl = parseTemplate(`import { useState } from "react";`);
+    const file = parseFile(`import { useState } from "react";`);
+    const result = matchProgram(tpl, file, {});
+    expect(result.ok).toBe(true);
+  });
+
+  it("rejects a literal template when the file's literal differs", () => {
+    const tpl = parseTemplate(`import { useState } from "react";`);
+    const file = parseFile(`import { useEffect } from "react";`);
+    const result = matchProgram(tpl, file, {});
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.messageId).toBe("divergence");
+  });
+
+  it("matches a literal statement followed by a placeholder slot", () => {
+    const tpl = parseTemplate(`import { useState } from "react";\n\${HOOKS}`);
+    const file = parseFile(`
+      import { useState } from "react";
+      function useThing() {}
+      function useOther() {}
+    `);
+    const slots: Record<string, Slot> = {
+      HOOKS: { type: "FunctionDeclaration", minOccurs: 1, maxOccurs: 5 },
+    };
+    const result = matchProgram(tpl, file, slots);
+    expect(result.ok).toBe(true);
+  });
+
+  it("rejects when the literal portion diverges even though slots could match", () => {
+    const tpl = parseTemplate(`import { useState } from "react";\n\${HOOKS}`);
+    const file = parseFile(`
+      import { useEffect } from "react";
+      function useThing() {}
+    `);
+    const slots: Record<string, Slot> = {
+      HOOKS: { type: "FunctionDeclaration", minOccurs: 1 },
+    };
+    const result = matchProgram(tpl, file, slots);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.messageId).toBe("divergence");
+  });
+
+  it("matches a literal shell with an inline placeholder for the function name", () => {
+    const tpl = parseTemplate(`export function \${NAME}() { return null; }`);
+    const file = parseFile(`export function widget() { return null; }`);
+    const result = matchProgram(tpl, file, {});
+    expect(result.ok).toBe(true);
+  });
+
+  it("rejects when the literal body of an inline-placeholder shell does not match", () => {
+    const tpl = parseTemplate(`export function \${NAME}() { return null; }`);
+    const file = parseFile(`export function widget() { return 42; }`);
+    const result = matchProgram(tpl, file, {});
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.messageId).toBe("divergence");
+  });
 });

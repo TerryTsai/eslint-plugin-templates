@@ -27,6 +27,11 @@ const baseProperties: Record<string, JSONSchema4> = {
 
 const stringEnum = (...values: string[]): JSONSchema4 => ({ type: "string", enum: values });
 
+/**
+ * Build a slot-variant schema by merging the variant's specific fields with the shared base.
+ * `additionalProperties: false` means cross-variant refinements (e.g. `arity` on an ImportSlot)
+ * are rejected at config-load time.
+ */
 const variant = (specific: Record<string, JSONSchema4>): JSONSchema4 => ({
   type: "object",
   properties: { ...baseProperties, ...specific },
@@ -80,6 +85,11 @@ const slot: JSONSchema4 = {
   oneOf: [importSlot, functionSlot, propertySlot, literalSlot, anySlot],
 };
 
+/**
+ * JSON Schema for the `templates/match` rule's options.
+ * Validated by ESLint at config-load time, so misconfigured templates fail
+ * before any file is linted.
+ */
 export const matchRuleSchema: JSONSchema4[] = [
   {
     type: "object",
