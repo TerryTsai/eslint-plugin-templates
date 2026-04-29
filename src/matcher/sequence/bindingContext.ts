@@ -1,4 +1,4 @@
-export interface BindingMismatch {
+interface BindingMismatch {
   name: string;
   bound: string;
   got: string;

@@ -9,7 +9,7 @@ import { applyRefinements } from "../refinements/applyRefinements";
 import { cardinalityOf } from "./cardinalityOf";
 import { fail } from "./fail";
 
-export interface ConsumeSuccess {
+interface ConsumeSuccess {
   ok: true;
   matched: TSESTree.Node[];
   nextIndex: number;

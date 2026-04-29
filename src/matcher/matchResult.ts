@@ -8,7 +8,7 @@ export interface MatchError {
   node: TSESTree.Node;
 }
 
-export interface MatchSuccess {
+interface MatchSuccess {
   ok: true;
   bindings: Record<string, TSESTree.Node[]>;
 }

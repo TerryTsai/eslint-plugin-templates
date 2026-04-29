@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.2
+
+Internal cleanup. No public API or behavior changes.
+
+- Folder restructure: `parsing/` pulled out of `matcher/` to reflect that template body parsing is preprocessing, separate from matching.
+- Plugin self-dogfooding extended; `brace-style` rule enforces multi-line function bodies.
+- Tooling refresh: vitest 3.2.4, GitHub Actions `checkout`/`setup-node` v6, Node 24 in CI.
+
 ## 0.1.1
 
 Internal cleanup. No public API or behavior changes.

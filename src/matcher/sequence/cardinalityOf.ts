@@ -1,6 +1,6 @@
 import { type Slot } from "../../types";
 
-export interface Cardinality {
+interface Cardinality {
   min: number;
   max: number;
 }

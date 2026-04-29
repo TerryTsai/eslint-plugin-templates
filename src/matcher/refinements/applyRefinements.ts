@@ -14,7 +14,7 @@ import { matchesNamed } from "./checks/matchesNamed";
 import { returnsKindMatches } from "./checks/returnsKindMatches";
 import { valueKindMatches } from "./checks/valueKindMatches";
 
-export type RefinementResult = { ok: true } | { ok: false; failed: string };
+type RefinementResult = { ok: true } | { ok: false; failed: string };
 
 interface RefinementBag {
   named?: NamedConstraint;
@@ -48,8 +48,6 @@ const CHECKS: Array<[keyof RefinementBag, Check]> = [
   ["matches", (n, v) => matchesLiteralValue(n, v as RegExp)],
 ];
 
-const PASS: RefinementResult = { ok: true };
-
 export function applyRefinements(node: TSESTree.Node, slot: Slot): RefinementResult {
   const bag = slot as RefinementBag;
   const wrap = unwrap(node);
@@ -58,5 +56,5 @@ export function applyRefinements(node: TSESTree.Node, slot: Slot): RefinementRes
     if (value === undefined) continue;
     if (!check(wrap.inner, value, wrap)) return { ok: false, failed: key };
   }
-  return PASS;
+  return { ok: true };
 }
