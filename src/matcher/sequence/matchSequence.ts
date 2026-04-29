@@ -33,8 +33,9 @@ export function matchSequence(
     if (error !== null) return error;
   }
   const trailing = fileNodes[state.fi];
-  if (trailing) return fail("extraContent", { found: trailing.type }, trailing);
-  return { ok: true, bindings: state.bindings };
+  return trailing
+    ? fail("extraContent", { found: trailing.type }, trailing)
+    : { ok: true, bindings: state.bindings };
 }
 
 function stepOne(
@@ -45,8 +46,9 @@ function stepOne(
   state: SequenceState,
 ): MatchResult | null {
   const placeholder = getStatementPlaceholder(tnode);
-  if (placeholder !== null) return stepPlaceholder(placeholder, fileNodes, slots, fallback, state);
-  return stepLiteral(tnode, fileNodes, fallback, state);
+  return placeholder !== null
+    ? stepPlaceholder(placeholder, fileNodes, slots, fallback, state)
+    : stepLiteral(tnode, fileNodes, fallback, state);
 }
 
 function stepPlaceholder(
@@ -77,9 +79,7 @@ function stepLiteral(
 }
 
 function reportLiteralFailure(tnode: TSESTree.Node, fnode: TSESTree.Node, ctx: BindingContext): MatchResult {
-  if (ctx.mismatch) {
-    const { name, bound, got } = ctx.mismatch;
-    return fail("bindingMismatch", { name, bound, got }, fnode);
-  }
-  return fail("divergence", { expected: tnode.type, found: fnode.type }, fnode);
+  if (!ctx.mismatch) return fail("divergence", { expected: tnode.type, found: fnode.type }, fnode);
+  const { name, bound, got } = ctx.mismatch;
+  return fail("bindingMismatch", { name, bound, got }, fnode);
 }

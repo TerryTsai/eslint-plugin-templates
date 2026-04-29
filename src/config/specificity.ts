@@ -10,8 +10,7 @@
 export function compareSpecificity(a: string, b: string): number {
   const aWild = countWildcards(a);
   const bWild = countWildcards(b);
-  if (aWild !== bWild) return bWild - aWild;
-  return literalChars(a) - literalChars(b);
+  return aWild !== bWild ? bWild - aWild : literalChars(a) - literalChars(b);
 }
 
 function countWildcards(pattern: string): number {

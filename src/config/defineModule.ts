@@ -26,15 +26,10 @@ export function defineModule<T extends Tree>(options: {
 
 function normalizeClosed(closed: ModuleOptions["closed"]): ClosedSpec | null {
   if (!closed) return null;
-  if (closed === true) {
-    return Object.freeze({
-      message: DEFAULT_CLOSED_MESSAGE,
-      extensions: Object.freeze([...DEFAULT_CLOSED_EXTENSIONS]),
-    });
-  }
+  const opts = closed === true ? {} : closed;
   return Object.freeze({
-    message: closed.message ?? DEFAULT_CLOSED_MESSAGE,
-    extensions: Object.freeze([...(closed.extensions ?? DEFAULT_CLOSED_EXTENSIONS)]),
+    message: opts.message ?? DEFAULT_CLOSED_MESSAGE,
+    extensions: Object.freeze([...(opts.extensions ?? DEFAULT_CLOSED_EXTENSIONS)]),
   });
 }
 

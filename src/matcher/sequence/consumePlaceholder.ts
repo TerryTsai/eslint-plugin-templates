@@ -38,8 +38,9 @@ export function consumePlaceholder(
   if (!slot) return fail("unknownSlot", { name }, fallback);
   const { min, max } = cardinalityOf(slot);
   const state = consumeMatching(slot, fileNodes, startIndex, max);
-  if (state.matched.length >= min) return { ok: true, matched: state.matched, nextIndex: state.nextIndex };
-  return reportInsufficient(name, slot, state, min, fileNodes, fallback);
+  return state.matched.length >= min
+    ? { ok: true, matched: state.matched, nextIndex: state.nextIndex }
+    : reportInsufficient(name, slot, state, min, fileNodes, fallback);
 }
 
 function consumeMatching(slot: Slot, fileNodes: readonly TSESTree.Node[], startIndex: number, max: number): ConsumeState {

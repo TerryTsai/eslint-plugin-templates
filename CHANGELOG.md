@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.2.1
+
+Internal cleanup. No public API or behavior changes.
+
+- Several `if/return; return` patterns collapsed to ternaries where the branches are pure expressions.
+- `partition` (`applyModule.ts`) reshaped to a declarative two-filter form.
+- `expandFolder` destructures `{ contents, closed }` once instead of checking `isModule` twice.
+- `normalizeClosed` (`defineModule.ts`) unifies the `closed === true` and object cases into a single return path.
+- `getParsed` (`match.ts`) replaces the `let`-and-double-assign idiom with explicit cache hit / miss branches.
+- Tightened `parsedCache` key type and dropped the over-explicit return type on `commonBlockFields`.
+
 ## 0.2.0
 
 New `eslint-plugin-templates/config` subpath for describing whole-folder layouts as reusable modules.

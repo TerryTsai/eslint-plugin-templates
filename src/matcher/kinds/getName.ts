@@ -16,8 +16,8 @@ function nameFromId(node: TSESTree.Node): string | null {
 
 function nameFromDeclarations(node: TSESTree.Node): string | null {
   if (node.type !== "VariableDeclaration" || node.declarations.length !== 1) return null;
-  const first = node.declarations[0];
-  return first?.id ? identifierName(first.id) : null;
+  const id = node.declarations[0]?.id;
+  return id ? identifierName(id) : null;
 }
 
 function nameFromKey(node: TSESTree.Node): string | null {

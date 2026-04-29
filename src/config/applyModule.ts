@@ -38,25 +38,23 @@ function expandTree(tree: Tree, closed: ClosedSpec | null, path: string, opts: A
 }
 
 function partition(tree: Tree): { files: FileEntry[]; folders: FolderEntry[] } {
-  const files: FileEntry[] = [];
-  const folders: FolderEntry[] = [];
-  for (const [key, value] of Object.entries(tree)) {
-    if (key.endsWith("/")) folders.push([key, value as Tree | Module]);
-    else files.push([key, value as MatchTemplate]);
-  }
-  return { files, folders };
+  const entries = Object.entries(tree);
+  return {
+    files: entries.filter(([k]) => !k.endsWith("/")) as FileEntry[],
+    folders: entries.filter(([k]) => k.endsWith("/")) as FolderEntry[],
+  };
 }
 
 function expandFolder(key: string, sub: Tree | Module, path: string, opts: ApplyOptions, blocks: FlatConfigBlock[]): void {
-  const isMod = isModule(sub);
-  expandTree(isMod ? sub.contents : sub, isMod ? sub.closed : null, `${path}/${key.slice(0, -1)}`, opts, blocks);
+  const { contents, closed } = isModule(sub) ? sub : { contents: sub, closed: null };
+  expandTree(contents, closed, `${path}/${key.slice(0, -1)}`, opts, blocks);
 }
 
 function isModule(value: Tree | Module): value is Module {
   return "__isModule" in value && value.__isModule === true;
 }
 
-function commonBlockFields(opts: ApplyOptions): Pick<FlatConfigBlock, "languageOptions" | "plugins"> {
+function commonBlockFields(opts: ApplyOptions) {
   return {
     languageOptions: { parser: opts.parser, parserOptions: { ...DEFAULT_PARSER_OPTIONS, ...opts.parserOptions } },
     plugins: { templates: plugin },

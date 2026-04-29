@@ -21,7 +21,7 @@ const messages: Record<MatchMessageId, string> = {
     'Template "{{templateId}}" references slot "{{name}}" that is not declared in `slots`.',
 };
 
-const parsedCache = new WeakMap<object, ParsedTemplate>();
+const parsedCache = new WeakMap<MatchTemplate, ParsedTemplate>();
 
 /**
  * Parse the template body once per template object.
@@ -29,9 +29,11 @@ const parsedCache = new WeakMap<object, ParsedTemplate>();
  * reparsing for every file in the run.
  */
 function getParsed(template: MatchTemplate): ParsedTemplate {
-  let parsed = parsedCache.get(template);
-  if (!parsed) parsedCache.set(template, (parsed = parseTemplate(template.body)));
-  return parsed;
+  const cached = parsedCache.get(template);
+  if (cached) return cached;
+  const fresh = parseTemplate(template.body);
+  parsedCache.set(template, fresh);
+  return fresh;
 }
 
 /**

@@ -32,7 +32,6 @@ export function nodeMatchesKind(node: TSESTree.Node, kind: NodeKind | NodeKind[]
 
 function matchesOneKind(node: TSESTree.Node, kind: NodeKind): boolean {
   const matches = KIND_PREDICATES[kind] ?? ((n: TSESTree.Node) => n.type === kind);
-  if (matches(node)) return true;
   const { inner } = unwrap(node);
-  return inner !== node && matches(inner);
+  return matches(node) || (inner !== node && matches(inner));
 }

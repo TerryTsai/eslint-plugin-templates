@@ -7,6 +7,6 @@ import { rule as matchRule } from "./rules/match";
  * can reference it without duplicating the wiring.
  */
 export const plugin = {
-  meta: { name: "eslint-plugin-templates", version: "0.2.0" },
+  meta: { name: "eslint-plugin-templates", version: "0.2.1" },
   rules: { match: matchRule, forbid: forbidRule },
 };
