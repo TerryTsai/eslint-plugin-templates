@@ -1,7 +1,7 @@
 import { type TSESTree } from "@typescript-eslint/typescript-estree";
 
 import { type NamedConstraint } from "../../../types";
-import { getName } from "../getName";
+import { getName } from "../../kinds/getName";
 
 export function matchesNamed(node: TSESTree.Node, constraint: NamedConstraint): boolean {
   const name = getName(node);

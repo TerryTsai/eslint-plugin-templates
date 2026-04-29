@@ -1,6 +1,6 @@
-import { parseTemplate, type ParsedTemplate } from "../matcher/parsing/parseTemplate";
-import { matchProgram } from "../matcher/sequence/matchProgram";
-import { type MatchMessageId } from "../matcher/sequence/matchResult";
+import { matchProgram } from "../matcher/matchProgram";
+import { type MatchMessageId } from "../matcher/matchResult";
+import { parseTemplate, type ParsedTemplate } from "../parsing/parseTemplate";
 import { type MatchTemplate } from "../types";
 
 import { createRule } from "./createRule";

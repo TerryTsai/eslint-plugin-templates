@@ -3,11 +3,11 @@ import { type TSESTree } from "@typescript-eslint/typescript-estree";
 import { type Slot } from "../../types";
 import { describeKind } from "../kinds/describeKind";
 import { nodeMatchesKind } from "../kinds/nodeMatchesKind";
+import { type MatchFailure } from "../matchResult";
 import { applyRefinements } from "../refinements/applyRefinements";
 
 import { cardinalityOf } from "./cardinalityOf";
 import { fail } from "./fail";
-import { type MatchFailure } from "./matchResult";
 
 export interface ConsumeSuccess {
   ok: true;

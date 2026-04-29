@@ -10,12 +10,12 @@ import { ruleFileTemplate } from "./eslint/templates/ruleFileTemplate.mjs";
 import { schemaFileTemplate } from "./eslint/templates/schemaFileTemplate.mjs";
 import { typesModuleTemplate } from "./eslint/templates/typesModuleTemplate.mjs";
 
-const TYPES_ONLY_FILES = ["src/types.ts", "src/matcher/sequence/matchResult.ts"];
+const TYPES_ONLY_FILES = ["src/types.ts", "src/matcher/matchResult.ts"];
 
 export default [
   { ignores },
   standardConfig({ files: ["src/**/*.ts"] }),
-  templateConfig({ files: ["src/matcher/**/*.ts"], ignores: ["src/matcher/refinements/checks/**", ...TYPES_ONLY_FILES], template: matcherTemplate }),
+  templateConfig({ files: ["src/matcher/**/*.ts", "src/parsing/**/*.ts"], ignores: ["src/matcher/refinements/checks/**", ...TYPES_ONLY_FILES], template: matcherTemplate }),
   templateConfig({ files: ["src/matcher/refinements/checks/*.ts"], template: leafCheckTemplate }),
   templateConfig({ files: TYPES_ONLY_FILES, template: typesModuleTemplate }),
   templateConfig({ files: ["src/rules/createRule.ts"], template: constantModuleTemplate }),

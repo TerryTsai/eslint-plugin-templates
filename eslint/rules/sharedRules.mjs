@@ -10,6 +10,7 @@ export const sharedRules = {
   "eqeqeq": ["error", "always"],
   "no-console": "error",
   "no-multiple-empty-lines": ["error", { max: 1, maxEOF: 0 }],
+  "brace-style": ["error", "1tbs", { allowSingleLine: false }],
   "no-unused-vars": "off",
   "@typescript-eslint/no-explicit-any": "error",
   "@typescript-eslint/no-unused-vars": ["error", { argsIgnorePattern: "^_" }],

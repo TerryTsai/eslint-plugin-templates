@@ -9,4 +9,6 @@ export interface BindingContext {
   mismatch: BindingMismatch | null;
 }
 
-export function bindingContext(): BindingContext { return { inline: new Map(), mismatch: null }; }
+export function bindingContext(): BindingContext {
+  return { inline: new Map(), mismatch: null };
+}

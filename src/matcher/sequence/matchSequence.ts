@@ -1,12 +1,12 @@
 import { type TSESTree } from "@typescript-eslint/typescript-estree";
 
+import { getStatementPlaceholder } from "../../parsing/getStatementPlaceholder";
 import { type Slot } from "../../types";
-import { getStatementPlaceholder } from "../parsing/getStatementPlaceholder";
+import { type MatchResult } from "../matchResult";
 
 import { type BindingContext, bindingContext } from "./bindingContext";
 import { consumePlaceholder } from "./consumePlaceholder";
 import { fail } from "./fail";
-import { type MatchResult } from "./matchResult";
 import { structurallyEqual } from "./structurallyEqual";
 
 interface SequenceState {

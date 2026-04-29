@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import { getStatementPlaceholder } from "../../src/matcher/parsing/getStatementPlaceholder";
-import { parseTemplate } from "../../src/matcher/parsing/parseTemplate";
-import { placeholderName } from "../../src/matcher/parsing/placeholderName";
+import { getStatementPlaceholder } from "../../src/parsing/getStatementPlaceholder";
+import { parseTemplate } from "../../src/parsing/parseTemplate";
+import { placeholderName } from "../../src/parsing/placeholderName";
 
 describe("parseTemplate", () => {
   it("collects every ${VAR} reference in the body", () => {

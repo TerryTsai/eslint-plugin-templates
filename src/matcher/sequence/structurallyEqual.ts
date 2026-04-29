@@ -1,4 +1,4 @@
-import { placeholderName } from "../parsing/placeholderName";
+import { placeholderName } from "../../parsing/placeholderName";
 
 import { type BindingContext } from "./bindingContext";
 

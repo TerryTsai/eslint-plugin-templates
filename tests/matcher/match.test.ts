@@ -1,8 +1,8 @@
 import { parse } from "@typescript-eslint/typescript-estree";
 import { describe, expect, it } from "vitest";
 
-import { parseTemplate } from "../../src/matcher/parsing/parseTemplate";
-import { matchProgram } from "../../src/matcher/sequence/matchProgram";
+import { matchProgram } from "../../src/matcher/matchProgram";
+import { parseTemplate } from "../../src/parsing/parseTemplate";
 import { type Slot } from "../../src/types";
 
 function parseFile(source: string) {
