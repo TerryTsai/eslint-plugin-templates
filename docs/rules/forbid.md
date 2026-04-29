@@ -1,10 +1,6 @@
 # `templates/forbid`
 
-Reject every file matched by this rule's `files` glob. Used together with ESLint's `ignores` to allow-list specific files and reject anything else.
-
-## How it works
-
-The rule fires on every file ESLint hands it. There's no template, no AST inspection — its only job is to report a diagnostic. Scoping is entirely the responsibility of ESLint's `files` and `ignores` globs.
+Reject every file matched by the rule's `files` glob. Pair with ESLint's `ignores` to allow-list specific files and reject anything else.
 
 ## Configuration
 
@@ -14,11 +10,9 @@ type ForbidOptions = {
 };
 ```
 
-The `message` field is the entire diagnostic text, customizable per rule block. Default: `"This file is not allowed in the current scope."`.
+`message` is the diagnostic text. Default: `"This file is not allowed in the current scope."`.
 
 ## Usage
-
-The pattern is `files` lists where the rule applies, `ignores` carves out the allow-list:
 
 ```js
 {
@@ -36,15 +30,15 @@ The pattern is `files` lists where the rule applies, `ignores` carves out the al
 }
 ```
 
-Any `.ts` file inside `src/services/*/` that isn't one of the allow-listed names triggers `forbidden`.
+Any `.ts` file in `src/services/*/` not on the allow-list triggers `forbidden`.
 
 ## Diagnostics
 
 | `messageId` | Message |
 |---|---|
-| `forbidden` | The configured `message`, or the default if none provided. |
+| `forbidden` | The configured `message`, or the default. |
 
 ## Limitations
 
-- ESLint only lints files matched by some configured rule's `files` glob. Non-linted files (e.g. `.md`, `.json` if no parser is configured for them) won't trigger this rule. To catch them, you need to extend ESLint's parser configuration to those file types.
-- The rule has no template — pair with `templates/match` when you also want to enforce the content of the files you do allow.
+- ESLint only lints files matched by some configured rule's `files` glob. Non-linted files (`.md`, `.json` without a configured parser, etc.) won't trigger this rule.
+- `forbid` has no template — pair with `templates/match` to enforce the content of files you do allow.

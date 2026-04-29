@@ -36,9 +36,12 @@ const srcModule = defineModule({
     "config/": {
       "applyModule.ts": matcherTemplate,
       "defineModule.ts": matcherTemplate,
-      "specificity.ts": matcherTemplate,
-      "validateTree.ts": matcherTemplate,
       "types.ts": typesModuleTemplate,
+      "internal/": {
+        "brand.ts": constantModuleTemplate,
+        "specificity.ts": matcherTemplate,
+        "validateTree.ts": matcherTemplate,
+      },
     },
   },
 });

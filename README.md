@@ -4,7 +4,7 @@
 [![CI](https://img.shields.io/github/actions/workflow/status/TerryTsai/eslint-plugin-templates/ci.yml?branch=main)](https://github.com/TerryTsai/eslint-plugin-templates/actions)
 [![License: MIT](https://img.shields.io/npm/l/eslint-plugin-templates.svg)](./LICENSE)
 
-ESLint plugin for matching files against declarative templates. You describe what a file should look like; the linter enforces that shape across your codebase. Useful where similar files share a structure — feature folders, route handlers, reducers.
+ESLint plugin for matching files against declarative templates. Describe what a file should look like; the linter enforces that shape across your codebase. Useful where similar files share a structure — feature folders, route handlers, reducers.
 
 ## Install
 
@@ -28,7 +28,10 @@ export default [{
   rules: {
     "templates/match": ["error", {
       id: "handler",
-      body: "${IMPORTS}\n${HANDLER}",
+      body: `
+        {{IMPORTS}}
+        {{HANDLER}}
+      `,
       slots: {
         IMPORTS: { type: "ImportDeclaration", minOccurs: 0 },
         HANDLER: { type: "FunctionDeclaration", exported: true, async: true },
@@ -38,42 +41,67 @@ export default [{
 }];
 ```
 
-Every file in `src/handlers/` must be zero or more imports followed by one exported async function. Anything else — a stray `const`, a second function, a top-level `console.log` — fails the lint.
-
-`body` uses `${SLOT}` placeholders for the parts that vary. Pass it as a regular string, not a JavaScript template literal — `` `${SLOT}` `` would interpolate at config-load time.
+Every file in `src/handlers/` must be zero or more imports followed by one exported async function. Anything else fails the lint.
 
 ## Body
 
-The `body` is parsed as TypeScript, so anything valid in TS is valid in a body. Three building blocks combine:
+The `body` is parsed as TypeScript. Three building blocks combine:
 
-- **Statement-level placeholders** — `${SLOT}` on its own line consumes zero or more file statements per the slot's type, cardinality, and refinements.
-- **Literal AST** — any non-placeholder code in the body must appear exactly in the file. The matcher walks the two ASTs in lockstep, ignoring source location.
-- **Inline placeholders** — `${NAME}` used in an expression or identifier position binds to whatever Identifier sits there in the file. A later `${NAME}` must agree, or `bindingMismatch` fires.
-
-A typical mix:
+- **Statement-level placeholders** — `{{SLOT}}` on its own line consumes file statements per the slot's type, cardinality, and refinements.
+- **Literal AST** — non-placeholder code must appear in the file as-is.
+- **Inline placeholders** — `{{NAME}}` in an expression or identifier position binds to the Identifier in that position. A later `{{NAME}}` must agree, or `bindingMismatch` fires.
 
 ```js
-body: 'import { useState } from "react";\n${HOOKS}\nexport function ${NAME}() {}'
+{
+  id: "express-resource",
+  body: `
+    import express from "express";
+    {{IMPORTS}}
+
+    export const router = express.Router();
+
+    {{ROUTES}}
+
+    {{HANDLERS}}
+  `,
+  slots: {
+    IMPORTS:  { type: "ImportDeclaration",  minOccurs: 0, maxOccurs: 10 },
+    ROUTES:   { type: "ExpressionStatement", minOccurs: 1, maxOccurs: 20 },
+    HANDLERS: { type: "FunctionDeclaration", async: true, arity: 2, minOccurs: 1 },
+  },
+}
 ```
 
-That requires:
+Files must:
 
-- The exact `import { useState } from "react";` line — wrong source path or missing specifier fails with `divergence`.
-- One or more `HOOKS` statements per the slot's rules.
-- A literal `export function () {}` shell, with `${NAME}` binding to the file's actual function name.
+- Start with `import express from "express";`.
+- Have zero or more additional imports.
+- Have `export const router = express.Router();`.
+- Register one or more routes (any expression statement).
+- Declare one or more async function handlers, each taking two parameters.
 
-Pure-slot bodies (`${A}\n${B}\n${C}`) and pure-literal bodies (no placeholders at all, requiring an exact file) are both valid — they're just special cases of this mix.
+Indentation, blank lines, and comments in the body are ignored.
+
+**Cross-position binding.** The same `{{NAME}}` placeholder in multiple inline positions must resolve to the same identifier:
+
+```js
+{
+  id: "exported-fn",
+  body: `
+    function {{NAME}}() {}
+    export { {{NAME}} };
+  `,
+}
+```
+
+`function listUsers() {} export { listUsers };` matches. `function listUsers() {} export { fetchUsers };` triggers `bindingMismatch`.
 
 ## Rules
-
-Two rules. Templates describe what's allowed; `forbid` rejects what isn't.
 
 - **`templates/match`** — match a file against a template
 - **`templates/forbid`** — reject every file the rule's glob covers
 
 ## `templates/match`
-
-The rule's options are the template:
 
 ```ts
 type MatchTemplate = {
@@ -83,11 +111,7 @@ type MatchTemplate = {
 };
 ```
 
-The matcher walks the template's AST against the file's AST in lockstep. Literal AST in the template must match exactly; `${SLOT}` placeholders in the body consume zero or more file nodes per the slot's type, cardinality, and refinements. Anything in the file not accounted for fails the lint.
-
 ### Slot variants
-
-Five variants, each typed by AST kind with its own refinements:
 
 | Variant | `type` values | Refinements |
 |---|---|---|
@@ -97,7 +121,7 @@ Five variants, each typed by AST kind with its own refinements:
 | `LiteralSlot` | `StringLiteral`, `NumericLiteral` | `matches`, `named` |
 | `AnySlot` | any other kind, or array of kinds | `named` |
 
-`AnySlot` is the fallback for kinds without specialized refinements (`ClassDeclaration`, `TSInterfaceDeclaration`, `VariableDeclaration`, etc.) and for matching multiple kinds at once via array `type`. The schema rejects cross-variant mismatches at config-load time — an `ImportSlot` with an `arity` field, for example, won't validate.
+`AnySlot` covers kinds without specialized refinements (`ClassDeclaration`, `TSInterfaceDeclaration`, `VariableDeclaration`, etc.) and matches multiple kinds via an array `type`. The schema rejects cross-variant refinements (e.g. `arity` on an `ImportSlot`) at config-load time.
 
 ### Refinements
 
@@ -116,7 +140,7 @@ Five variants, each typed by AST kind with its own refinements:
 | `readonly` | `PropertySlot` | `boolean` | The `readonly` flag |
 | `matches` | `LiteralSlot` | `RegExp` | The literal value |
 
-Export-wrapper transparency: `{ type: "FunctionDeclaration" }` matches both `function foo() {}` and `export function foo() {}`. Filter with `exported`/`default`. To match the wrapper itself, use `{ type: "ExportNamedDeclaration" }` via `AnySlot`.
+`{ type: "FunctionDeclaration" }` matches both `function foo() {}` and `export function foo() {}`. Filter with `exported`/`default`. To match the wrapper itself, use `{ type: "ExportNamedDeclaration" }` via `AnySlot`.
 
 ### Cardinality
 
@@ -128,16 +152,6 @@ Export-wrapper transparency: `{ type: "FunctionDeclaration" }` matches both `fun
 | `maxOccurs: M` only | up to M, default min 1 |
 | both | between min and max, inclusive |
 
-### Cross-position binding
-
-The same `${NAME}` placeholder in multiple inline positions unifies on the file's identifier:
-
-```js
-body: "function ${NAME}() {}\nexport { ${NAME} };"
-```
-
-`function foo() {} export { foo };` matches. `function foo() {} export { bar };` triggers `bindingMismatch`.
-
 ### Diagnostics
 
 | `messageId` | When |
@@ -145,9 +159,9 @@ body: "function ${NAME}() {}\nexport { ${NAME} };"
 | `divergence` | A literal template node and the file's node have different shapes |
 | `missingRequired` | A slot's `minOccurs` couldn't be satisfied |
 | `refinementFailed` | A node matched the slot's kind but failed a refinement |
-| `bindingMismatch` | A `${NAME}` placeholder used in two positions resolved to different identifiers |
+| `bindingMismatch` | A `{{NAME}}` placeholder used in two positions resolved to different identifiers |
 | `extraContent` | The file has trailing content the template doesn't account for |
-| `unknownSlot` | The body references `${X}` but `slots.X` isn't declared |
+| `unknownSlot` | The body references `{{X}}` but `slots.X` isn't declared |
 
 [Full reference →](./docs/rules/match.md)
 
@@ -181,8 +195,6 @@ Default message: `"This file is not allowed in the current scope."`.
 
 ## Composing the rules
 
-Combining `match` for content rules with `forbid` for the allow-list:
-
 ```js
 import templates from "eslint-plugin-templates";
 import tsParser from "@typescript-eslint/parser";
@@ -190,14 +202,16 @@ import tsParser from "@typescript-eslint/parser";
 const base = { languageOptions: { parser: tsParser }, plugins: { templates } };
 
 export default [
-  // Handlers: imports, then one exported async function named handle*
   {
     ...base,
     files: ["src/services/*/handler-*.ts"],
     rules: {
       "templates/match": ["error", {
         id: "service-handler",
-        body: "${IMPORTS}\n${HANDLER}",
+        body: `
+          {{IMPORTS}}
+          {{HANDLER}}
+        `,
         slots: {
           IMPORTS: { type: "ImportDeclaration", minOccurs: 0 },
           HANDLER: {
@@ -211,14 +225,13 @@ export default [
     },
   },
 
-  // types.ts: only interfaces and type aliases
   {
     ...base,
     files: ["src/services/*/types.ts"],
     rules: {
       "templates/match": ["error", {
         id: "service-types",
-        body: "${TYPES}",
+        body: "{{TYPES}}",
         slots: {
           TYPES: {
             type: ["TSInterfaceDeclaration", "TSTypeAliasDeclaration"],
@@ -229,7 +242,6 @@ export default [
     },
   },
 
-  // Anything else in a service folder is rejected
   {
     ...base,
     files: ["src/services/*/*.ts"],
@@ -249,15 +261,12 @@ export default [
 
 ## Modules
 
-For codebases where many folders share a structural shape — for example, a microservice with a folder per REST resource — `eslint-plugin-templates/config` lets you describe the whole-folder layout once with `defineModule` and apply it with `applyModule`:
+For codebases where many folders share the same shape, `eslint-plugin-templates/config` describes the layout once with `defineModule` and applies it with `applyModule`:
 
 ```js
 import { applyModule, defineModule } from "eslint-plugin-templates/config";
 import tsParser from "@typescript-eslint/parser";
 
-// Every folder under src/api/ (users, posts, comments, ...) has the same shape:
-// router/controller/service/model at the top, a validation/ sub-folder with
-// its own internal structure, and colocated tests.
 const apiResourceModule = defineModule({
   contents: {
     "router.ts": routerTemplate,
@@ -278,27 +287,17 @@ const apiResourceModule = defineModule({
 
 export default [
   ...applyModule({ module: apiResourceModule, root: "src/api/*", parser: tsParser }),
-  // Same shape reused at another root:
   ...applyModule({ module: apiResourceModule, root: "apps/*/api/*", parser: tsParser }),
 ];
 ```
 
-The example exercises most of the surface area:
-
-- **Literal file entries** (`router.ts`, `controller.ts`) for required files at known paths.
-- **File globs** (`*.test.ts`, `validators/*.ts`) for any file matching a pattern within a folder.
-- **Plain folder entries** with object values for simple sub-trees (`validators/`).
-- **Nested `defineModule`** for folder-local options — the `validation/` folder sets its own `closed: true`, separate from the top-level `closed`.
-- **`closed`** at multiple levels: top-level rejects unknown files in the resource folder; the `validation/` sub-module rejects extras in its scope.
-
-`applyModule` expands the tree into one ESLint config block per leaf entry, orders sibling globs by specificity (most-specific wins), and emits a `templates/forbid` block for the folder when `closed` is set. Modules are pure data — define once, apply at as many roots as you like.
+`applyModule` expands the tree into one ESLint config block per entry, orders sibling globs by specificity (most-specific wins), and emits a `templates/forbid` block for the folder when `closed` is set.
 
 Tree conventions:
 
 - Keys ending in `/` are folders; their value is a nested tree (or another `defineModule` for folder-local options).
 - Keys without `/` are files — literal names (`"index.ts"`) or single-folder globs (`"*.ts"`, `"*.test.ts"`).
-- Multi-segment keys (`"a/b/c.ts"`) are rejected — nest folders explicitly.
-- `**` is rejected. Modules describe structure; use `templates/match` directly when you need depth-agnostic matching.
+- Multi-segment keys (`"a/b/c.ts"`) and `**` are rejected; nest folders explicitly.
 
 `closed: true` (or `closed: { message, extensions }`) rejects any file in *that* folder not matched by a direct entry. Nested folders own their own scope. Default extensions are `["ts"]`.
 
@@ -307,7 +306,7 @@ Tree conventions:
 ## Limitations
 
 - One template per `templates/match` rule invocation. Use multiple ESLint config blocks (or a module) with different `files` globs to apply different templates to different parts of the codebase.
-- Modules enforce upper bounds (forbid extras when `closed`) but not lower bounds — ESLint can't require a file that isn't there.
+- Modules can reject unwanted files (with `closed`) but can't require missing files to exist.
 - No autofix.
 - No type-resolved checks; everything is syntactic.
 - `templates/forbid` only sees files ESLint lints. To catch non-JS/TS files (`*.md`, `*.json`, etc.), extend ESLint's parser configuration to those file types.

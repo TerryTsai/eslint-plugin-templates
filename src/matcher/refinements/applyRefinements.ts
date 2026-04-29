@@ -31,21 +31,29 @@ interface RefinementBag {
   matches?: RegExp;
 }
 
-type Check = (inner: TSESTree.Node, value: unknown, wrap: Unwrapped) => boolean;
+type RefineFn<K extends keyof RefinementBag> = (
+  inner: TSESTree.Node,
+  value: NonNullable<RefinementBag[K]>,
+  wrap: Unwrapped,
+) => boolean;
 
-const CHECKS: Array<[keyof RefinementBag, Check]> = [
-  ["named", (n, v) => matchesNamed(n, v as NamedConstraint)],
-  ["typeOnly", (n, v) => isImportTypeOnly(n) === v],
-  ["fromPath", (n, v) => getImportFromPath(n) === v],
-  ["async", (n, v) => isAsyncFunction(n) === v],
-  ["arity", (n, v) => getFunctionArity(n) === v],
-  ["returnsKind", (n, v) => returnsKindMatches(n, v as NodeKind | NodeKind[])],
-  ["exported", (_, v, w) => w.exported === v],
-  ["default", (_, v, w) => w.isDefault === v],
-  ["valueKind", (n, v) => valueKindMatches(n, v as NodeKind | NodeKind[])],
-  ["optional", (n, v) => isOptionalProperty(n) === v],
-  ["readonly", (n, v) => isReadonlyProperty(n) === v],
-  ["matches", (n, v) => matchesLiteralValue(n, v as RegExp)],
+interface RefineEntry {
+  apply: (bag: RefinementBag, inner: TSESTree.Node, wrap: Unwrapped) => RefinementResult | null;
+}
+
+const CHECKS: RefineEntry[] = [
+  entry("named", (n, v) => matchesNamed(n, v)),
+  entry("typeOnly", (n, v) => isImportTypeOnly(n) === v),
+  entry("fromPath", (n, v) => getImportFromPath(n) === v),
+  entry("async", (n, v) => isAsyncFunction(n) === v),
+  entry("arity", (n, v) => getFunctionArity(n) === v),
+  entry("returnsKind", (n, v) => returnsKindMatches(n, v)),
+  entry("exported", (_, v, w) => w.exported === v),
+  entry("default", (_, v, w) => w.isDefault === v),
+  entry("valueKind", (n, v) => valueKindMatches(n, v)),
+  entry("optional", (n, v) => isOptionalProperty(n) === v),
+  entry("readonly", (n, v) => isReadonlyProperty(n) === v),
+  entry("matches", (n, v) => matchesLiteralValue(n, v)),
 ];
 
 /**
@@ -56,10 +64,25 @@ const CHECKS: Array<[keyof RefinementBag, Check]> = [
 export function applyRefinements(node: TSESTree.Node, slot: Slot): RefinementResult {
   const bag = slot as RefinementBag;
   const wrap = unwrap(node);
-  for (const [key, check] of CHECKS) {
-    const value = bag[key];
-    if (value === undefined) continue;
-    if (!check(wrap.inner, value, wrap)) return { ok: false, failed: key };
+  for (const e of CHECKS) {
+    const result = e.apply(bag, wrap.inner, wrap);
+    if (result) return result;
   }
   return { ok: true };
+}
+
+/**
+ * Build a `RefineEntry` that closes over the per-key types. Hides the generic
+ * `K` behind a uniform `apply` method so the dispatch loop in
+ * `applyRefinements` doesn't need any casts to call into a heterogeneous
+ * collection of typed checks.
+ */
+function entry<K extends keyof RefinementBag>(key: K, fn: RefineFn<K>): RefineEntry {
+  return {
+    apply(bag, inner, wrap) {
+      const value = bag[key];
+      if (value === undefined) return null;
+      return fn(inner, value, wrap) ? null : { ok: false, failed: key };
+    },
+  };
 }

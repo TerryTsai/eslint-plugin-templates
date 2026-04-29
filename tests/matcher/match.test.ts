@@ -11,7 +11,10 @@ function parseFile(source: string) {
 
 describe("matchProgram", () => {
   it("matches a file with imports and functions against a generic template", () => {
-    const tpl = parseTemplate(`\${IMPORTS}\n\${FUNCTIONS}`);
+    const tpl = parseTemplate(`
+      {{IMPORTS}}
+      {{FUNCTIONS}}
+    `);
     const file = parseFile(`
       import { a } from "a";
       import { b } from "b";
@@ -31,7 +34,10 @@ describe("matchProgram", () => {
   });
 
   it("matches a file with no imports when IMPORTS is minOccurs:0", () => {
-    const tpl = parseTemplate(`\${IMPORTS}\n\${FUNCTIONS}`);
+    const tpl = parseTemplate(`
+      {{IMPORTS}}
+      {{FUNCTIONS}}
+    `);
     const file = parseFile(`function hello() {}`);
     const slots: Record<string, Slot> = {
       IMPORTS: { type: "ImportDeclaration", minOccurs: 0 },
@@ -42,7 +48,10 @@ describe("matchProgram", () => {
   });
 
   it("rejects a file missing required functions", () => {
-    const tpl = parseTemplate(`\${IMPORTS}\n\${FUNCTIONS}`);
+    const tpl = parseTemplate(`
+      {{IMPORTS}}
+      {{FUNCTIONS}}
+    `);
     const file = parseFile(`import { a } from "a";`);
     const slots: Record<string, Slot> = {
       IMPORTS: { type: "ImportDeclaration", minOccurs: 0 },
@@ -57,7 +66,10 @@ describe("matchProgram", () => {
   });
 
   it("rejects a file with a forbidden top-level node", () => {
-    const tpl = parseTemplate(`\${IMPORTS}\n\${FUNCTIONS}`);
+    const tpl = parseTemplate(`
+      {{IMPORTS}}
+      {{FUNCTIONS}}
+    `);
     const file = parseFile(`
       import { a } from "a";
       const x = 1;
@@ -72,7 +84,7 @@ describe("matchProgram", () => {
   });
 
   it("respects maxOccurs as upper bound", () => {
-    const tpl = parseTemplate(`\${FUNCTIONS}`);
+    const tpl = parseTemplate("{{FUNCTIONS}}");
     const file = parseFile(`function a(){} function b(){}`);
     const slots: Record<string, Slot> = {
       FUNCTIONS: { type: "FunctionDeclaration", minOccurs: 1, maxOccurs: 1 },
@@ -82,7 +94,7 @@ describe("matchProgram", () => {
   });
 
   it("reports unknownSlot for placeholders without a matching slot definition", () => {
-    const tpl = parseTemplate(`\${MISSING}`);
+    const tpl = parseTemplate("{{MISSING}}");
     const file = parseFile(``);
     const result = matchProgram(tpl, file, {});
     expect(result.ok).toBe(false);
@@ -92,7 +104,7 @@ describe("matchProgram", () => {
   });
 
   it("matches multiple file kinds via array type", () => {
-    const tpl = parseTemplate(`\${ANY}`);
+    const tpl = parseTemplate("{{ANY}}");
     const file = parseFile(`
       const x = 1;
       function f() {}
@@ -105,15 +117,27 @@ describe("matchProgram", () => {
   });
 
   it("unifies inline placeholders across positions when names agree", () => {
-    const tpl = parseTemplate(`function \${NAME}() {}\nexport { \${NAME} };`);
-    const file = parseFile(`function helloWorld() {}\nexport { helloWorld };`);
+    const tpl = parseTemplate(`
+      function {{NAME}}() {}
+      export { {{NAME}} };
+    `);
+    const file = parseFile(`
+      function helloWorld() {}
+      export { helloWorld };
+    `);
     const result = matchProgram(tpl, file, {});
     expect(result.ok).toBe(true);
   });
 
   it("rejects when an inline placeholder is bound to two different identifiers", () => {
-    const tpl = parseTemplate(`function \${NAME}() {}\nexport { \${NAME} };`);
-    const file = parseFile(`function helloWorld() {}\nexport { goodbye };`);
+    const tpl = parseTemplate(`
+      function {{NAME}}() {}
+      export { {{NAME}} };
+    `);
+    const file = parseFile(`
+      function helloWorld() {}
+      export { goodbye };
+    `);
     const result = matchProgram(tpl, file, {});
     expect(result.ok).toBe(false);
     if (!result.ok) {
@@ -139,7 +163,10 @@ describe("matchProgram", () => {
   });
 
   it("matches a literal statement followed by a placeholder slot", () => {
-    const tpl = parseTemplate(`import { useState } from "react";\n\${HOOKS}`);
+    const tpl = parseTemplate(`
+      import { useState } from "react";
+      {{HOOKS}}
+    `);
     const file = parseFile(`
       import { useState } from "react";
       function useThing() {}
@@ -153,7 +180,10 @@ describe("matchProgram", () => {
   });
 
   it("rejects when the literal portion diverges even though slots could match", () => {
-    const tpl = parseTemplate(`import { useState } from "react";\n\${HOOKS}`);
+    const tpl = parseTemplate(`
+      import { useState } from "react";
+      {{HOOKS}}
+    `);
     const file = parseFile(`
       import { useEffect } from "react";
       function useThing() {}
@@ -167,14 +197,14 @@ describe("matchProgram", () => {
   });
 
   it("matches a literal shell with an inline placeholder for the function name", () => {
-    const tpl = parseTemplate(`export function \${NAME}() { return null; }`);
+    const tpl = parseTemplate(`export function {{NAME}}() { return null; }`);
     const file = parseFile(`export function widget() { return null; }`);
     const result = matchProgram(tpl, file, {});
     expect(result.ok).toBe(true);
   });
 
   it("rejects when the literal body of an inline-placeholder shell does not match", () => {
-    const tpl = parseTemplate(`export function \${NAME}() { return null; }`);
+    const tpl = parseTemplate(`export function {{NAME}}() { return null; }`);
     const file = parseFile(`export function widget() { return 42; }`);
     const result = matchProgram(tpl, file, {});
     expect(result.ok).toBe(false);

@@ -5,29 +5,35 @@ import { parseTemplate } from "../../src/parsing/parseTemplate";
 import { placeholderName } from "../../src/parsing/placeholderName";
 
 describe("parseTemplate", () => {
-  it("collects every ${VAR} reference in the body", () => {
+  it("collects every {{VAR}} reference in the body", () => {
     const result = parseTemplate(`
-      \${IMPORTS}
+      {{IMPORTS}}
 
-      \${FUNCTIONS}
+      {{FUNCTIONS}}
     `);
     expect(result.variableNames).toEqual(new Set(["IMPORTS", "FUNCTIONS"]));
   });
 
   it("produces a Program with placeholder Identifiers at top-level", () => {
-    const result = parseTemplate(`\${IMPORTS}\n\${FUNCTIONS}`);
+    const result = parseTemplate(`
+      {{IMPORTS}}
+      {{FUNCTIONS}}
+    `);
     expect(result.ast.body).toHaveLength(2);
     expect(getStatementPlaceholder(result.ast.body[0]!)).toBe("IMPORTS");
     expect(getStatementPlaceholder(result.ast.body[1]!)).toBe("FUNCTIONS");
   });
 
-  it("ignores ${var} with non-uppercase identifiers", () => {
-    const result = parseTemplate("const x = `${value}`;");
+  it("ignores {{var}} with non-uppercase identifiers", () => {
+    const result = parseTemplate("const x = '{{value}}';");
     expect(result.variableNames.size).toBe(0);
   });
 
   it("supports the same placeholder appearing twice", () => {
-    const result = parseTemplate(`\${A}\nconst x = \${A};`);
+    const result = parseTemplate(`
+      {{A}}
+      const x = {{A}};
+    `);
     expect(result.variableNames).toEqual(new Set(["A"]));
   });
 });

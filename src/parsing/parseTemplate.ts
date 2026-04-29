@@ -4,7 +4,7 @@ import { PLACEHOLDER_PREFIX, PLACEHOLDER_REGEX, PLACEHOLDER_SUFFIX } from "./pla
 
 /**
  * A template body that has been preprocessed and parsed once.
- * `variableNames` is the set of `${VAR}` references found in the body.
+ * `variableNames` is the set of `{{VAR}}` references found in the body.
  */
 export interface ParsedTemplate {
   ast: TSESTree.Program;
@@ -12,7 +12,7 @@ export interface ParsedTemplate {
 }
 
 /**
- * Preprocess `${VAR}` placeholders into unique identifiers, then parse the result
+ * Preprocess `{{VAR}}` placeholders into unique identifiers, then parse the result
  * so the matcher can walk a real AST. The placeholder identifiers are recognized
  * later by `placeholderName`.
  */

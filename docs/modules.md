@@ -1,10 +1,10 @@
 # Modules
 
-A higher-level way to declare ESLint configuration for codebases where many folders share a structural shape. A module describes "what files live here and what each one looks like" as a single tree; `applyModule` wires it to a root path.
+Declare an ESLint configuration for a folder shape as a single tree, then apply it at one or more roots.
 
 ## When to reach for it
 
-Use a module when you'd otherwise write multiple `templates/match` (and `templates/forbid`) config blocks for the same folder shape. Stick with raw `templates/match` when you have a single template applied to a single glob — the module wrapper isn't doing much for you there.
+Use a module when you'd otherwise write multiple `templates/match` (and `templates/forbid`) config blocks for the same folder shape. Stick with raw `templates/match` for a single template applied to a single glob.
 
 ## API
 
@@ -30,47 +30,41 @@ type Tree = {
 type ApplyOptions = {
   module: Module;
   root: string;
-  parser: unknown;                       // ESLint parser module (e.g. @typescript-eslint/parser)
+  parser: Parser;                        // ESLint parser module (e.g. @typescript-eslint/parser)
   parserOptions?: Record<string, unknown>;
 };
 ```
 
-`defineModule` validates the tree, freezes the result, and returns an opaque `Module`. `applyModule` expands a `Module` into an array of ESLint flat-config blocks rooted at `options.root`.
-
 ## Tree conventions
 
-- **Folder keys** end in `/` — `"kinds/"`, `"refinements/"`. Their value is another `Tree` (or a `Module` for folder-local options like `closed`).
+- **Folder keys** end in `/` — `"kinds/"`, `"refinements/"`. Their value is another `Tree` or a `Module`.
 - **File keys** have no `/` — literal names (`"index.ts"`) or single-folder globs (`"*.ts"`, `"*.test.ts"`). Their value is a `MatchTemplate`.
-- **Multi-segment keys** (`"a/b/c.ts"`) are rejected. Nest folders explicitly.
-- **`**`** is rejected anywhere in a key. Modules describe structure; `**` undermines the structural premise.
+- **Multi-segment keys** (`"a/b/c.ts"`) and **`**`** are rejected. Nest folders explicitly.
 
-Violations throw at `defineModule` time with a message naming the offending key path.
+Violations throw at `defineModule` with a message naming the offending key path.
 
 ## Sibling glob precedence
 
-Within a single folder, sibling keys may overlap. `applyModule` orders them by specificity so ESLint's last-wins semantics applies the most-specific rule:
+Within a folder, sibling keys may overlap. `applyModule` orders them by specificity:
 
 - Fewer wildcards is more specific.
 - Among ties, more literal characters is more specific.
 
-So `{ "*.ts": A, "*.test.ts": B, "index.ts": C }` emits in order `*.ts` → `*.test.ts` → `index.ts`. For `index.ts`, all three blocks match; `templates/match` from the `index.ts` block wins. The order keys are written in does not matter.
+`{ "*.ts": A, "*.test.ts": B, "index.ts": C }` emits in order `*.ts` → `*.test.ts` → `index.ts`. For `index.ts`, all three match; `templates/match` from the `index.ts` block wins. Insertion order does not matter.
 
 ## Closed scope
 
-`closed: true` (or `closed: { message, extensions }`) emits a `templates/forbid` block over the folder. Any file matching `${root}/${path}/*.${ext}` that isn't matched by a direct entry triggers the diagnostic.
+`closed: true` (or `closed: { message, extensions }`) emits a `templates/forbid` block over the folder. Any file with one of the listed extensions that isn't matched by a direct entry triggers the diagnostic.
 
 Defaults:
 - `message`: `"This file is not allowed in the current scope."`
 - `extensions`: `["ts"]`
 
-Scoping rules:
-- `closed` only acts on the folder where it's declared. Nested folders own their own scope.
-- `closed` only fires on lint-able files. Non-TS files (e.g. `.md`, `.json`) won't be touched unless ESLint is configured to lint them.
-- `closed` rejects extras (upper bound). It does **not** require minimum members — ESLint lints existing files; it never sees what isn't there.
+`closed` only acts on the folder where it's declared; nested folders own their own scope. It only fires on files ESLint actually lints. It rejects unwanted files but doesn't require expected ones to exist.
 
-## Nesting and folder-local options
+## Nesting
 
-A folder value can be either a plain `Tree` (just contents) or another `defineModule` (contents plus options like `closed`). A microservice resource with a nested validation folder:
+A folder value can be a plain `Tree` or another `defineModule` (for folder-local options like `closed`):
 
 ```js
 const apiResourceModule = defineModule({
@@ -79,11 +73,11 @@ const apiResourceModule = defineModule({
     "controller.ts": controllerTemplate,
     "service.ts": serviceTemplate,
     "model.ts": modelTemplate,
-    "validation/": defineModule({                    // nested module with its own closed scope
+    "validation/": defineModule({
       closed: true,
       contents: {
         "schema.ts": schemaTemplate,
-        "validators/": { "*.ts": validatorTemplate }, // plain tree
+        "validators/": { "*.ts": validatorTemplate },
       },
     }),
     "*.test.ts": testTemplate,
@@ -93,8 +87,6 @@ const apiResourceModule = defineModule({
 
 ## Reuse across roots
 
-Modules are pure data. Apply the same shape to multiple roots:
-
 ```js
 export default [
   ...applyModule({ module: apiResourceModule, root: "src/api/*", parser: tsParser }),
@@ -102,9 +94,9 @@ export default [
 ];
 ```
 
-Each `applyModule` call produces an independent set of flat-config blocks. `root` itself can be a glob — `"src/api/*"` means "every direct child of `src/api/`."
+`root` itself can be a glob — `"src/api/*"` means "every direct child of `src/api/`."
 
-## Block names for debugging
+## Block names
 
 Each emitted block carries a `name` identifying its position in the tree:
 
@@ -115,7 +107,6 @@ Run `npx eslint --print-config <file>` to see which named block applied to a giv
 
 ## Limitations
 
-- Modules enforce *upper bounds* (forbid extras with `closed`) but not *lower bounds* — ESLint can't require a file that doesn't exist. Documented expectations of "must have index.ts" need a different tool (script, pre-commit hook, etc.).
-- One template per file. If you need a file to satisfy multiple constraints, combine them in a single template.
-- Two `applyModule` calls covering the same file path both emit blocks; ESLint's last-wins semantics applies. Avoid overlapping roots, or accept the resulting precedence.
-- Module expansion scales with leaf count. Realistic trees (tens to low hundreds of leaves) are fine; pathologically large trees slow ESLint config matching.
+- Modules can reject unwanted files (with `closed`) but can't require missing files to exist.
+- One template per file. Combine constraints in a single template if needed.
+- Two `applyModule` calls covering the same file path both emit blocks; ESLint's last-wins semantics applies.

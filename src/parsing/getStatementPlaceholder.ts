@@ -3,7 +3,7 @@ import { type TSESTree } from "@typescript-eslint/typescript-estree";
 import { placeholderName } from "./placeholderName";
 
 /**
- * Recognize a top-level `${VAR}` placeholder (parsed as `ExpressionStatement` wrapping an Identifier).
+ * Recognize a top-level `{{VAR}}` placeholder (parsed as `ExpressionStatement` wrapping an Identifier).
  * Returns the placeholder name or `null` for ordinary statements.
  */
 export function getStatementPlaceholder(node: TSESTree.Node): string | null {

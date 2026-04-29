@@ -1,9 +1,9 @@
-/** Prefix wrapped around a `${VAR}` placeholder so the result is a valid JS identifier. */
+/** Prefix the matcher wraps around a placeholder name so the preprocessed body parses as valid TS. */
 export const PLACEHOLDER_PREFIX = "__TEMPLATE_VAR_";
 /** Suffix paired with `PLACEHOLDER_PREFIX`. */
 export const PLACEHOLDER_SUFFIX = "__";
-/** Matches `${VAR}` syntax in a template body — uppercase letters, digits, and underscores only. */
-export const PLACEHOLDER_REGEX = /\$\{([A-Z_][A-Z0-9_]*)\}/g;
+/** Matches `{{VAR}}` placeholder syntax in a template body — uppercase letters, digits, and underscores only. */
+export const PLACEHOLDER_REGEX = /\{\{([A-Z_][A-Z0-9_]*)\}\}/g;
 
 /**
  * Recover a placeholder's original name from its wrapped identifier,

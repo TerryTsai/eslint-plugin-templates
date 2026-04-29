@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.3.0
+
+**Breaking:** placeholder syntax changed from `${SLOT}` to `{{SLOT}}`. Every existing template body needs the substitution.
+
+The new syntax doesn't collide with JS template-literal interpolation, so multi-line backtick bodies work without escapes:
+
+```js
+body: `
+  {{IMPORTS}}
+  {{HANDLER}}
+`
+```
+
+Other changes:
+
+- Internal: `Module` is now branded with a `Symbol` instead of an `__isModule` string discriminator.
+- Internal: `ApplyOptions.parser` is typed structurally instead of `unknown`.
+- Internal: refinement dispatch table reworked to preserve per-key types end-to-end.
+- Internal: plugin `meta` is read from `package.json` at runtime — no more hand-maintained `version` copy.
+- Internal: `src/config/internal/` separates `applyModule`/`defineModule`/`types` from helpers.
+- Documentation pass to remove redundancy and over-explanation.
+
 ## 0.2.1
 
 Internal cleanup. No public API or behavior changes.

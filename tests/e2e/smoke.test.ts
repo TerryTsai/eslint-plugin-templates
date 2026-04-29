@@ -70,7 +70,10 @@ function withMatch(templates: BuiltPlugin): ESLint {
             "error",
             {
               id: "handler",
-              body: "${IMPORTS}\n${HANDLER}",
+              body: `
+                {{IMPORTS}}
+                {{HANDLER}}
+              `,
               slots: {
                 IMPORTS: { type: "ImportDeclaration", minOccurs: 0 },
                 HANDLER: { type: "FunctionDeclaration", exported: true, async: true },

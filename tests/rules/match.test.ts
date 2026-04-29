@@ -19,7 +19,10 @@ const ruleTester = new RuleTester({
 
 const featureTemplate: MatchTemplate = {
   id: "feature",
-  body: "${IMPORTS}\n${FUNCTIONS}",
+  body: `
+    {{IMPORTS}}
+    {{FUNCTIONS}}
+  `,
   slots: {
     IMPORTS: { type: "ImportDeclaration", minOccurs: 0 },
     FUNCTIONS: { type: "FunctionDeclaration", minOccurs: 1 },
@@ -58,7 +61,7 @@ ruleTester.run("match", rule, {
       options: [
         {
           id: "feature",
-          body: "${FUNCTIONS}",
+          body: "{{FUNCTIONS}}",
           slots: { FUNCTIONS: { type: "FunctionDeclaration", minOccurs: 1 } },
         },
       ],
@@ -67,7 +70,7 @@ ruleTester.run("match", rule, {
     {
       name: "placeholder without a matching slot definition",
       code: `function hello() {}`,
-      options: [{ id: "feature", body: "${MISSING}" }],
+      options: [{ id: "feature", body: "{{MISSING}}" }],
       errors: [{ messageId: "unknownSlot", data: { name: "MISSING", templateId: "feature" } }],
     },
     {
@@ -76,7 +79,7 @@ ruleTester.run("match", rule, {
       options: [
         {
           id: "feature",
-          body: "${FN}",
+          body: "{{FN}}",
           slots: { FN: { type: "FunctionDeclaration", named: /^create/ } },
         },
       ],
@@ -88,7 +91,7 @@ ruleTester.run("match", rule, {
       options: [
         {
           id: "feature",
-          body: "${REACT}",
+          body: "{{REACT}}",
           slots: { REACT: { type: "ImportDeclaration", fromPath: "react" } },
         },
       ],
@@ -106,7 +109,10 @@ ruleTester.run("match", rule, {
       options: [
         {
           id: "feature",
-          body: "function ${NAME}() {}\nexport { ${NAME} };",
+          body: `
+            function {{NAME}}() {}
+            export { {{NAME}} };
+          `,
         },
       ],
       errors: [{ messageId: "bindingMismatch" }],
@@ -117,7 +123,10 @@ ruleTester.run("match", rule, {
       options: [
         {
           id: "feature",
-          body: 'import { useState } from "react";\n${HOOKS}',
+          body: `
+            import { useState } from "react";
+            {{HOOKS}}
+          `,
           slots: { HOOKS: { type: "FunctionDeclaration", minOccurs: 1 } },
         },
       ],
@@ -128,7 +137,10 @@ ruleTester.run("match", rule, {
 
 const literalTemplate: MatchTemplate = {
   id: "feature",
-  body: 'import { useState } from "react";\n${HOOKS}',
+  body: `
+    import { useState } from "react";
+    {{HOOKS}}
+  `,
   slots: { HOOKS: { type: "FunctionDeclaration", minOccurs: 1, maxOccurs: 5 } },
 };
 
@@ -142,7 +154,7 @@ ruleTester.run("match (literal text in body)", rule, {
     {
       name: "literal shell with an inline placeholder for the function name",
       code: `export function widget() { return null; }`,
-      options: [{ id: "feature", body: "export function ${NAME}() { return null; }" }],
+      options: [{ id: "feature", body: "export function {{NAME}}() { return null; }" }],
     },
   ],
   invalid: [],

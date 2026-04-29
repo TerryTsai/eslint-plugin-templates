@@ -8,7 +8,7 @@ const validate = ajv.compile(matchRuleSchema[0]!);
 
 const valid = (template: unknown): boolean => validate(template) as boolean;
 const validWith = (slotX: unknown): boolean =>
-  valid({ id: "x", body: "${X}", slots: { X: slotX } });
+  valid({ id: "x", body: "{{X}}", slots: { X: slotX } });
 
 describe("schema", () => {
   it("accepts a minimal template", () => {

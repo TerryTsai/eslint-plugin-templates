@@ -1,4 +1,6 @@
-import { type Tree } from "./types";
+import { type Tree } from "../types";
+
+import { MODULE_BRAND } from "./brand";
 
 const FOLDER_RE = /^[^/]+\/$/;
 const FILE_RE = /^[^/]+$/;
@@ -7,6 +9,11 @@ const FILE_RE = /^[^/]+$/;
  * Walk a contents tree and throw if any key violates the convention:
  * folder keys end with exactly one `/` (no internal `/`), file keys have no `/` at all,
  * and `**` is forbidden everywhere.
+ *
+ * Mirrors the rules expressed at the type level by `ValidKey<K>` in `./types`;
+ * keep the two in sync. The static check guides typed callers; this runtime
+ * pass is defense in depth for callers who bypass the types via casts or
+ * dynamic objects.
  */
 export function validateTree(tree: Tree, path = ""): void {
   for (const key of Object.keys(tree)) {
@@ -28,7 +35,7 @@ function rejectBadKey(key: string, path: string): void {
 }
 
 function isNestedTree(value: unknown): value is Tree {
-  return typeof value === "object" && value !== null && !("__isModule" in value);
+  return typeof value === "object" && value !== null && !(MODULE_BRAND in value);
 }
 
 function error(path: string, reason: string): Error {

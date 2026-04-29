@@ -1,5 +1,18 @@
 import { type MatchTemplate } from "../types";
 
+import { type MODULE_BRAND } from "./internal/brand";
+
+/**
+ * Minimal structural type for an ESLint parser module.
+ * Mirrors what ESLint actually expects in `languageOptions.parser`; declared
+ * here so we don't take a type dependency on `eslint` or
+ * `@typescript-eslint/parser` purely for the API surface.
+ */
+export interface Parser {
+  parse?: (text: string, options?: object) => unknown;
+  parseForESLint?: (text: string, options?: object) => { ast: unknown; [key: string]: unknown };
+}
+
 /**
  * Recursive tree describing a module's contents.
  * Folder keys end with `/` and take a nested tree; file keys (literal names
@@ -51,10 +64,13 @@ export interface ClosedSpec {
 
 /**
  * A reusable module shape: contents tree + optional closed-scope rejection.
- * Modules are pure data — reuse across multiple roots by calling `applyModule` once per root.
+ * Discriminated from a plain `Tree` by the `MODULE_BRAND` symbol so a
+ * user-named key like `"__isModule"` can never be confused for one.
+ * Modules are pure data — reuse across multiple roots by calling
+ * `applyModule` once per root.
  */
 export interface Module {
-  readonly __isModule: true;
+  readonly [MODULE_BRAND]: true;
   readonly contents: Tree;
   readonly closed: ClosedSpec | null;
 }
@@ -67,6 +83,6 @@ export interface ModuleOptions {
 export interface ApplyOptions {
   module: Module;
   root: string;
-  parser: unknown;
+  parser: Parser;
   parserOptions?: Record<string, unknown>;
 }

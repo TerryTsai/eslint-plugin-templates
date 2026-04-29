@@ -3,10 +3,11 @@ import { rule as matchRule } from "./rules/match";
 
 /**
  * The plugin object: meta + rules.
- * Exported here so both the CJS entry (src/index.ts) and the config helpers
- * can reference it without duplicating the wiring.
+ * `meta` is read from `package.json` at runtime so the source doesn't carry
+ * a hand-maintained `name`/`version` copy that can drift on release. ESLint
+ * reads `meta.name` and `meta.version` only; the rest of the json is inert.
  */
 export const plugin = {
-  meta: { name: "eslint-plugin-templates", version: "0.2.1" },
+  meta: require("../package.json") as { name: string; version: string },
   rules: { match: matchRule, forbid: forbidRule },
 };

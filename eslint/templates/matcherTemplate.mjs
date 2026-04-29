@@ -1,6 +1,11 @@
 export const matcherTemplate = {
   id: "matcher-module",
-  body: "${IMPORTS}\n${SETUP}\n${EXPORTED}\n${INTERNALS}",
+  body: `
+    {{IMPORTS}}
+    {{SETUP}}
+    {{EXPORTED}}
+    {{INTERNALS}}
+  `,
   slots: {
     IMPORTS: { type: "ImportDeclaration", minOccurs: 0, maxOccurs: 20 },
     SETUP: { type: ["TSTypeAliasDeclaration", "TSInterfaceDeclaration", "VariableDeclaration"], minOccurs: 0, maxOccurs: 10 },

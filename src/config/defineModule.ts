@@ -1,5 +1,6 @@
+import { MODULE_BRAND } from "./internal/brand";
+import { validateTree } from "./internal/validateTree";
 import { type ClosedSpec, type Module, type ModuleOptions, type Tree, type ValidatedTree } from "./types";
-import { validateTree } from "./validateTree";
 
 const DEFAULT_CLOSED_MESSAGE = "This file is not allowed in the current scope.";
 const DEFAULT_CLOSED_EXTENSIONS = ["ts"] as const;
@@ -17,7 +18,7 @@ export function defineModule<T extends Tree>(options: {
   validateTree(options.contents);
   const closed = normalizeClosed(options.closed);
   const module: Module = {
-    __isModule: true,
+    [MODULE_BRAND]: true,
     contents: deepFreeze(options.contents),
     closed,
   };

@@ -1,39 +1,36 @@
 # `templates/match`
 
-Enforce that a file's whole-program shape matches a declared template. Files matched by ESLint's `files` glob must structurally match the template body, modulo declared `${SLOT}` placeholders.
-
-## How matching works
-
-The template body is parsed once per template object. For each file ESLint hands the rule, the matcher walks the template's `Program.body` against the file's `Program.body` in lockstep:
-
-- Literal AST in the template must match exactly.
-- `${SLOT}` placeholders consume zero or more file nodes per the slot's `type`, cardinality, and refinements.
-
-The match is whole-file. Anything in the file not accounted for by the template fails the lint.
+Match a file's whole-program shape against a declared template. Files matched by the rule's `files` glob must structurally match the template body, with `{{SLOT}}` placeholders standing in for the parts that vary.
 
 ## Body composition
 
-The `body` is parsed as TypeScript. Anything valid in TS is valid in a body, and three building blocks combine to describe a file's shape:
+The `body` is parsed as TypeScript. Three building blocks combine:
 
 ### Statement-level placeholders
 
-`${SLOT}` on its own line consumes one or more file statements according to the slot's `type`, cardinality, and refinements.
+`{{SLOT}}` on its own line consumes file statements per the slot's `type`, cardinality, and refinements.
 
 ```js
-body: "${IMPORTS}\n${EXPORTED}"
+body: `
+  {{IMPORTS}}
+  {{EXPORTED}}
+`
 ```
 
 ### Literal AST
 
-Anything that isn't a placeholder is literal — it must appear in the file with the same AST shape. Source location is ignored, but every other field is compared.
+Non-placeholder code in the body must appear in the file as-is. Source location is ignored; everything else is compared.
 
 ```js
-body: 'import { useState } from "react";\n${HOOKS}'
+body: `
+  import { useState } from "react";
+  {{HOOKS}}
+`
 ```
 
-The file must start with that exact import (wrong source path, missing or extra specifier all fail with `divergence`), then satisfy `HOOKS`.
+The file must start with that exact import, then satisfy `HOOKS`.
 
-A body with no placeholders at all is valid — it requires an exact-shape file:
+A body with no placeholders requires an exact-shape file:
 
 ```js
 body: "export const VERSION = '1.0.0';"
@@ -41,31 +38,22 @@ body: "export const VERSION = '1.0.0';"
 
 ### Inline placeholders
 
-`${NAME}` in an expression or identifier position (anywhere other than a top-level statement) becomes a binding hole. The first occurrence accepts whatever Identifier sits there in the file; later occurrences must agree, or `bindingMismatch` fires.
+`{{NAME}}` in an expression or identifier position binds to the Identifier in that position. A later `{{NAME}}` must agree, or `bindingMismatch` fires.
 
 ```js
-body: "function ${NAME}() {}\nexport { ${NAME} };"
+body: `
+  function {{NAME}}() {}
+  export { {{NAME}} };
+`
 ```
 
 `function foo() {} export { foo };` matches. `function foo() {} export { bar };` triggers `bindingMismatch`.
 
-A literal shell with an inline name placeholder lets you constrain everything *but* the name:
+A literal shell with an inline placeholder lets you constrain everything *but* the name:
 
 ```js
-body: "export function ${NAME}() { return null; }"
+body: "export function {{NAME}}() { return null; }"
 ```
-
-That requires the file to be exactly an exported function returning `null` — only the function's name varies.
-
-### Combining them
-
-Mix freely. The matcher resolves each template top-level statement as either a placeholder (treated per slot rules) or as literal AST (deep-compared, with inline placeholders unifying):
-
-```js
-body: 'import { useState } from "react";\n${HOOKS}\nexport function ${NAME}() {}'
-```
-
-Required: the exact import, one or more `HOOKS` statements, then a literal `export function () {}` shell with `${NAME}` bound to whatever the file names it.
 
 ## Configuration
 
@@ -88,8 +76,6 @@ type BaseSlot = {
 ```
 
 ## Variants
-
-The `Slot` union has five variants, each with refinements appropriate to its AST kind.
 
 ### `ImportSlot`
 
@@ -121,7 +107,7 @@ type FunctionSlot = BaseSlot & {
 };
 ```
 
-`exported`/`default` consult the export wrapper around the function. Other refinements apply to the unwrapped declaration, so `{ type: "FunctionDeclaration" }` matches both `function foo() {}` and `export function foo() {}` transparently.
+`exported`/`default` check the export wrapper; other refinements check the unwrapped declaration. So `{ type: "FunctionDeclaration" }` matches both `function foo() {}` and `export function foo() {}`.
 
 `{ type: "FunctionDeclaration", exported: true, async: true, named: /^handle/ }` matches `export async function handleX() { … }`.
 
@@ -159,7 +145,7 @@ type AnySlot = BaseSlot & {
 };
 ```
 
-The fallback for kinds without specialized refinements (`ClassDeclaration`, `TSInterfaceDeclaration`, `VariableDeclaration`, etc.) and for matching multiple kinds at once via array `type`.
+Fallback for kinds without specialized refinements (`ClassDeclaration`, `TSInterfaceDeclaration`, `VariableDeclaration`, etc.) and for matching multiple kinds via array `type`.
 
 ## Refinements
 
@@ -190,15 +176,16 @@ The fallback for kinds without specialized refinements (`ClassDeclaration`, `TSI
 
 ## Cross-position binding
 
-When the same `${NAME}` placeholder appears in multiple inline expression positions, the matcher unifies them. The first occurrence binds the placeholder to the file's identifier; subsequent occurrences must agree.
+The same `{{NAME}}` placeholder in multiple inline expression positions unifies on the file's identifier:
 
 ```js
-body: "function ${NAME}() {}\nexport { ${NAME} };"
+body: `
+  function {{NAME}}() {}
+  export { {{NAME}} };
+`
 ```
 
 `function foo() {} export { foo };` matches. `function foo() {} export { bar };` triggers `bindingMismatch`.
-
-Statement-level cross-binding (the same placeholder consumed twice as a top-level statement) is not supported in v0 — use distinct placeholder names for separate statement-level slots.
 
 ## Supported node kinds
 
@@ -218,11 +205,11 @@ Logical kind names map to TSESTree AST `type` values:
 | `StringLiteral` | `Literal` (string value) |
 | `NumericLiteral` | `Literal` (number value) |
 
-Other kinds (`ClassDeclaration`, `TSInterfaceDeclaration`, `VariableDeclaration`, etc.) pass through the AST `type` value directly via `AnySlot`.
+Other kinds (`ClassDeclaration`, `TSInterfaceDeclaration`, `VariableDeclaration`, etc.) pass through the AST `type` directly via `AnySlot`.
 
-## Export-wrapper transparency
+## Export wrappers
 
-`{ type: "FunctionDeclaration" }` matches both `function foo() {}` and `export function foo() {}`. Filter with the `exported` and `default` refinements:
+`{ type: "FunctionDeclaration" }` matches both `function foo() {}` and `export function foo() {}`. Filter with `exported`/`default`:
 
 | Refinement | Matches |
 |---|---|
@@ -231,7 +218,7 @@ Other kinds (`ClassDeclaration`, `TSInterfaceDeclaration`, `VariableDeclaration`
 | `default: true` | only `export default function …` |
 | `exported: false` | only the non-exported form |
 
-To match the export wrapper itself, use `{ type: "ExportNamedDeclaration" }` via `AnySlot`.
+To match the wrapper itself, use `{ type: "ExportNamedDeclaration" }` via `AnySlot`.
 
 ## Diagnostics
 
@@ -246,13 +233,12 @@ To match the export wrapper itself, use `{ type: "ExportNamedDeclaration" }` via
 
 ## Limitations
 
-- One template per rule invocation — use multiple ESLint config blocks with different `files` globs to apply different templates to different parts of the codebase.
-- No statement-level cross-binding.
+- One template per rule invocation. Use multiple ESLint config blocks with different `files` globs to apply different templates to different parts of the codebase.
+- Cross-position binding only applies to inline placeholders. The same statement-level `{{SLOT}}` consumed twice doesn't unify; use distinct names.
 - No autofix.
 - No type-resolved checks; everything is syntactic.
 
 ## Authoring tips
 
-- Use a regular string for `body`, never a JS template literal. `"${SLOT}"` is a placeholder; `` `${SLOT}` `` interpolates at JS-parse time.
-- Slot names are uppercase by convention (the placeholder regex is `[A-Z_][A-Z0-9_]*`).
-- The same `${NAME}` in multiple inline positions unifies. Use distinct names for separate slots.
+- Slot names must be uppercase letters, digits, and underscores (the placeholder regex is `[A-Z_][A-Z0-9_]*`).
+- The same `{{NAME}}` in multiple inline positions unifies. Use distinct names for separate slots.

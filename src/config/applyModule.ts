@@ -1,7 +1,8 @@
 import { plugin } from "../plugin";
 import { type MatchTemplate } from "../types";
 
-import { compareSpecificity } from "./specificity";
+import { MODULE_BRAND } from "./internal/brand";
+import { compareSpecificity } from "./internal/specificity";
 import { type ApplyOptions, type ClosedSpec, type Module, type Tree } from "./types";
 
 interface FlatConfigBlock {
@@ -51,7 +52,7 @@ function expandFolder(key: string, sub: Tree | Module, path: string, opts: Apply
 }
 
 function isModule(value: Tree | Module): value is Module {
-  return "__isModule" in value && value.__isModule === true;
+  return MODULE_BRAND in value;
 }
 
 function commonBlockFields(opts: ApplyOptions) {
