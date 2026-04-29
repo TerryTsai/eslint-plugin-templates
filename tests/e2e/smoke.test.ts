@@ -1,6 +1,7 @@
 import { execSync } from "node:child_process";
 import { createRequire } from "node:module";
 import * as path from "node:path";
+
 import * as parser from "@typescript-eslint/parser";
 import { ESLint } from "eslint";
 import { beforeAll, describe, expect, it } from "vitest";
@@ -25,7 +26,9 @@ beforeAll(() => {
 
 describe("e2e: built plugin loads and runs through ESLint", () => {
   it("plugin metadata has the expected shape", () => {
+    const pkg = requireCJS(path.join(ROOT, "package.json")) as { version: string };
     expect(plugin.meta.name).toBe("eslint-plugin-templates");
+    expect(plugin.meta.version).toBe(pkg.version);
     expect(plugin.rules).toHaveProperty("match");
     expect(plugin.rules).toHaveProperty("forbid");
   });

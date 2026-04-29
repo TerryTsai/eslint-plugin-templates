@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.1
+
+Internal cleanup. No public API or behavior changes.
+
+- Matcher reorganized into `parsing/`, `kinds/`, `refinements/checks/`, `sequence/` subfolders, one export per file.
+- Plugin now self-dogfoods: ESLint config applies the plugin's own `templates/match` rule to its source files.
+
 ## 0.1.0
 
 Initial release.

@@ -1,6 +1,7 @@
 import * as parser from "@typescript-eslint/parser";
 import { RuleTester } from "@typescript-eslint/rule-tester";
 import { afterAll, describe, it } from "vitest";
+
 import { rule } from "../../src/rules/match";
 import type { MatchTemplate } from "../../src/types";
 

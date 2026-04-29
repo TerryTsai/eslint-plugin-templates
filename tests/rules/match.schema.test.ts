@@ -1,5 +1,6 @@
 import Ajv from "ajv";
 import { describe, expect, it } from "vitest";
+
 import { matchRuleSchema } from "../../src/rules/match.schema";
 
 const ajv = new Ajv({ allErrors: false });

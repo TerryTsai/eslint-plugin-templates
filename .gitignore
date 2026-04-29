@@ -7,3 +7,4 @@ coverage/
 .npm/
 .env
 .env.local
+.claude/

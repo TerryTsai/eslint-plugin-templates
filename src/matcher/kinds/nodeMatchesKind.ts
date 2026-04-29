@@ -1,5 +1,8 @@
-import { TSESTree } from "@typescript-eslint/typescript-estree";
-import type { NodeKind } from "../types";
+import { type TSESTree } from "@typescript-eslint/typescript-estree";
+
+import { type NodeKind } from "../../types";
+
+import { unwrap } from "./unwrap";
 
 type KindPredicate = (node: TSESTree.Node) => boolean;
 
@@ -17,16 +20,9 @@ const KIND_PREDICATES: Record<string, KindPredicate> = {
   NumericLiteral: (n) => n.type === "Literal" && typeof n.value === "number",
 };
 
-export function unwrap(
-  node: TSESTree.Node,
-): { inner: TSESTree.Node; exported: boolean; isDefault: boolean } {
-  if (node.type === "ExportNamedDeclaration" && node.declaration) {
-    return { inner: node.declaration, exported: true, isDefault: false };
-  }
-  if (node.type === "ExportDefaultDeclaration") {
-    return { inner: node.declaration, exported: true, isDefault: true };
-  }
-  return { inner: node, exported: false, isDefault: false };
+export function nodeMatchesKind(node: TSESTree.Node, kind: NodeKind | NodeKind[]): boolean {
+  const kinds = Array.isArray(kind) ? kind : [kind];
+  return kinds.some((k) => matchesOneKind(node, k));
 }
 
 function matchesOneKind(node: TSESTree.Node, kind: NodeKind): boolean {
@@ -34,13 +30,4 @@ function matchesOneKind(node: TSESTree.Node, kind: NodeKind): boolean {
   if (matches(node)) return true;
   const { inner } = unwrap(node);
   return inner !== node && matches(inner);
-}
-
-export function nodeMatchesKind(node: TSESTree.Node, kind: NodeKind | NodeKind[]): boolean {
-  const kinds = Array.isArray(kind) ? kind : [kind];
-  return kinds.some((k) => matchesOneKind(node, k));
-}
-
-export function describeKind(kind: NodeKind | NodeKind[]): string {
-  return Array.isArray(kind) ? kind.join(" | ") : kind;
 }

@@ -1,4 +1,4 @@
-import { createRule } from "./_common";
+import { createRule } from "./createRule";
 import { forbidRuleSchema } from "./forbid.schema";
 
 export type ForbidMessageId = "forbidden";

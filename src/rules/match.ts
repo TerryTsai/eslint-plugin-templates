@@ -1,7 +1,9 @@
-import { matchProgram, type MatchMessageId } from "../matcher/match";
-import { parseTemplate, type ParsedTemplate } from "../matcher/parse-template";
-import type { MatchTemplate } from "../types";
-import { createRule } from "./_common";
+import { parseTemplate, type ParsedTemplate } from "../matcher/parsing/parseTemplate";
+import { matchProgram } from "../matcher/sequence/matchProgram";
+import { type MatchMessageId } from "../matcher/sequence/matchResult";
+import { type MatchTemplate } from "../types";
+
+import { createRule } from "./createRule";
 import { matchRuleSchema } from "./match.schema";
 
 const messages: Record<MatchMessageId, string> = {

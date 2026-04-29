@@ -1,6 +1,7 @@
 import { parse, type TSESTree } from "@typescript-eslint/typescript-estree";
 import { describe, expect, it } from "vitest";
-import { applyRefinements } from "../../src/matcher/refinements";
+
+import { applyRefinements } from "../../src/matcher/refinements/applyRefinements";
 import type { Slot } from "../../src/types";
 
 function parseSource(source: string): TSESTree.Program {

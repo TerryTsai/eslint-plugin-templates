@@ -14,12 +14,7 @@ export interface ImportSlot extends BaseSlot {
   fromPath?: string;
 }
 
-export type FunctionKind =
-  | "FunctionDeclaration"
-  | "ArrowFunction"
-  | "FunctionExpression"
-  | "MethodDeclaration"
-  | "MethodSignature";
+export type FunctionKind = "FunctionDeclaration" | "ArrowFunction" | "FunctionExpression" | "MethodDeclaration" | "MethodSignature";
 
 export interface FunctionSlot extends BaseSlot {
   type: FunctionKind;
@@ -30,10 +25,7 @@ export interface FunctionSlot extends BaseSlot {
   default?: boolean;
 }
 
-export type PropertyKind =
-  | "PropertyAssignment"
-  | "PropertySignature"
-  | "PropertyDeclaration";
+export type PropertyKind = "PropertyAssignment" | "PropertySignature" | "PropertyDeclaration";
 
 export interface PropertySlot extends BaseSlot {
   type: PropertyKind;
@@ -53,12 +45,7 @@ export interface AnySlot extends BaseSlot {
   type: NodeKind | NodeKind[];
 }
 
-export type Slot =
-  | ImportSlot
-  | FunctionSlot
-  | PropertySlot
-  | LiteralSlot
-  | AnySlot;
+export type Slot = ImportSlot | FunctionSlot | PropertySlot | LiteralSlot | AnySlot;
 
 export interface MatchTemplate {
   id: string;
