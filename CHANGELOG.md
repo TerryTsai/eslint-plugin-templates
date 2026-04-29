@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.0
+
+**Breaking:** `closed` on a `defineModule` now propagates to descendant folders that don't declare their own. Before, `closed` was strictly local. Set it once at the top of a tree and the whole subtree is locked; nested modules with their own `closed` continue to override (different message, different extensions, etc.).
+
+If you had `closed` only at the top of a tree before, descendant folders are now locked too. To opt a subtree out, wrap it in a `defineModule` and either omit `closed` or override it.
+
 ## 0.3.0
 
 **Breaking:** placeholder syntax changed from `${SLOT}` to `{{SLOT}}`. Every existing template body needs the substitution.

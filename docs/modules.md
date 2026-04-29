@@ -60,7 +60,9 @@ Defaults:
 - `message`: `"This file is not allowed in the current scope."`
 - `extensions`: `["ts"]`
 
-`closed` only acts on the folder where it's declared; nested folders own their own scope. It only fires on files ESLint actually lints. It rejects unwanted files but doesn't require expected ones to exist.
+`closed` propagates: a parent's `closed` applies to all descendant folders unless one declares its own. Set it once at the top of the tree and the whole subtree is locked. A nested module's `closed` overrides the inherited value (different message, different extensions, etc.).
+
+It only fires on files ESLint actually lints. It rejects unwanted files but doesn't require expected ones to exist.
 
 ## Nesting
 

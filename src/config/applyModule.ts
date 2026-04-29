@@ -22,7 +22,8 @@ const DEFAULT_PARSER_OPTIONS: Record<string, unknown> = { ecmaVersion: 2022, sou
 /**
  * Expand a module shape into ESLint flat-config blocks rooted at `options.root`.
  * Each file entry becomes a `templates/match` block; closed scopes add a
- * `templates/forbid` block targeting any unmatched file in that folder.
+ * `templates/forbid` block per folder. `closed` propagates to descendant
+ * folders that don't set their own.
  */
 export function applyModule(options: ApplyOptions): FlatConfigBlock[] {
   const blocks: FlatConfigBlock[] = [];
@@ -34,7 +35,7 @@ function expandTree(tree: Tree, closed: ClosedSpec | null, path: string, opts: A
   const { files, folders } = partition(tree);
   files.sort(([a], [b]) => compareSpecificity(a, b));
   for (const [key, template] of files) blocks.push(matchBlock(`${path}/${key}`, template, opts));
-  for (const [key, sub] of folders) expandFolder(key, sub, path, opts, blocks);
+  for (const [key, sub] of folders) expandFolder(key, sub, path, opts, blocks, closed);
   if (closed) blocks.push(forbidBlock(path, files.map(([k]) => k), closed, opts));
 }
 
@@ -46,9 +47,17 @@ function partition(tree: Tree): { files: FileEntry[]; folders: FolderEntry[] } {
   };
 }
 
-function expandFolder(key: string, sub: Tree | Module, path: string, opts: ApplyOptions, blocks: FlatConfigBlock[]): void {
+function expandFolder(
+  key: string,
+  sub: Tree | Module,
+  path: string,
+  opts: ApplyOptions,
+  blocks: FlatConfigBlock[],
+  inherited: ClosedSpec | null,
+): void {
   const { contents, closed } = isModule(sub) ? sub : { contents: sub, closed: null };
-  expandTree(contents, closed, `${path}/${key.slice(0, -1)}`, opts, blocks);
+  const effective = closed ?? inherited;
+  expandTree(contents, effective, `${path}/${key.slice(0, -1)}`, opts, blocks);
 }
 
 function isModule(value: Tree | Module): value is Module {

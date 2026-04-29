@@ -1,6 +1,6 @@
 {
   "name": "eslint-plugin-templates",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "ESLint plugin that enforces structural conformance of files against declarative templates.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -23,7 +23,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint src tests eslint",
+    "lint": "eslint src tests eslint eslint.config.mjs",
     "prelint": "npm run build",
     "test": "vitest run",
     "test:watch": "vitest",

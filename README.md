@@ -299,7 +299,7 @@ Tree conventions:
 - Keys without `/` are files — literal names (`"index.ts"`) or single-folder globs (`"*.ts"`, `"*.test.ts"`).
 - Multi-segment keys (`"a/b/c.ts"`) and `**` are rejected; nest folders explicitly.
 
-`closed: true` (or `closed: { message, extensions }`) rejects any file in *that* folder not matched by a direct entry. Nested folders own their own scope. Default extensions are `["ts"]`.
+`closed: true` (or `closed: { message, extensions }`) rejects any file in the folder not matched by a direct entry. The setting propagates to descendant folders that don't declare their own — set it once at the top to lock the whole subtree. Default extensions are `["ts"]`.
 
 [Full reference →](./docs/modules.md)
 

@@ -1,11 +1,11 @@
 export const leafCheckTemplate = {
-  id: "refinement-check",
+  id: "leaf-check",
   body: `
     {{IMPORTS}}
     {{CHECK}}
   `,
   slots: {
-    IMPORTS: { type: "ImportDeclaration", minOccurs: 1, maxOccurs: 5 },
+    IMPORTS: { type: "ImportDeclaration", minOccurs: 1, maxOccurs: 3 },
     CHECK: { type: "FunctionDeclaration", exported: true, minOccurs: 1, maxOccurs: 1 },
   },
 };
