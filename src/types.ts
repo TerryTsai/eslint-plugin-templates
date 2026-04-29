@@ -1,21 +1,14 @@
 export type NodeKind = string;
 
-export type Severity = "error" | "warning" | "info";
-
 export type NamedConstraint = string | RegExp;
 
-export interface Template {
-  body?: string;
-  variables?: Record<string, Variable>;
-}
-
-export interface BaseVariable extends Template {
+export interface BaseSlot {
   minOccurs?: number;
   maxOccurs?: number;
   named?: NamedConstraint;
 }
 
-export interface ImportVariable extends BaseVariable {
+export interface ImportSlot extends BaseSlot {
   type: "ImportDeclaration";
   typeOnly?: boolean;
   fromPath?: string;
@@ -28,7 +21,7 @@ export type FunctionKind =
   | "MethodDeclaration"
   | "MethodSignature";
 
-export interface FunctionVariable extends BaseVariable {
+export interface FunctionSlot extends BaseSlot {
   type: FunctionKind;
   async?: boolean;
   arity?: number;
@@ -42,7 +35,7 @@ export type PropertyKind =
   | "PropertySignature"
   | "PropertyDeclaration";
 
-export interface PropertyVariable extends BaseVariable {
+export interface PropertySlot extends BaseSlot {
   type: PropertyKind;
   valueKind?: NodeKind | NodeKind[];
   optional?: boolean;
@@ -51,30 +44,24 @@ export interface PropertyVariable extends BaseVariable {
 
 export type LiteralKind = "StringLiteral" | "NumericLiteral";
 
-export interface LiteralVariable extends BaseVariable {
+export interface LiteralSlot extends BaseSlot {
   type: LiteralKind;
   matches?: RegExp;
 }
 
-export interface AnyVariable extends BaseVariable {
+export interface AnySlot extends BaseSlot {
   type: NodeKind | NodeKind[];
 }
 
-export type Variable =
-  | ImportVariable
-  | FunctionVariable
-  | PropertyVariable
-  | LiteralVariable
-  | AnyVariable;
+export type Slot =
+  | ImportSlot
+  | FunctionSlot
+  | PropertySlot
+  | LiteralSlot
+  | AnySlot;
 
-export interface FileTemplate extends Template {
+export interface MatchTemplate {
   id: string;
   body: string;
-  description?: string;
-  message?: string;
-  severity?: Severity;
-}
-
-export interface FileRuleOptions {
-  template: FileTemplate;
+  slots?: Record<string, Slot>;
 }

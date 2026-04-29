@@ -1,5 +1,5 @@
 import type { TSESTree } from "@typescript-eslint/typescript-estree";
-import type { NamedConstraint, NodeKind, Variable } from "../types";
+import type { NamedConstraint, NodeKind, Slot } from "../types";
 import { nodeMatchesKind, unwrap } from "./kind-mapping";
 
 export type RefinementResult = { ok: true } | { ok: false; failed: string };
@@ -22,8 +22,8 @@ interface RefinementBag {
   matches?: RegExp;
 }
 
-export function applyRefinements(node: TSESTree.Node, variable: Variable): RefinementResult {
-  const v = variable as RefinementBag;
+export function applyRefinements(node: TSESTree.Node, slot: Slot): RefinementResult {
+  const v = slot as RefinementBag;
   const { inner, exported, isDefault } = unwrap(node);
 
   if (v.named !== undefined && !matchesNamed(inner, v.named)) return fail("named");

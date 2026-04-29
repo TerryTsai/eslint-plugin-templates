@@ -1,11 +1,12 @@
 {
   "name": "eslint-plugin-templates",
-  "version": "0.1.0-dev",
+  "version": "0.1.0",
   "description": "ESLint plugin that enforces structural conformance of files against declarative templates.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "files": [
     "dist",
+    "CHANGELOG.md",
     "LICENSE",
     "README.md"
   ],

@@ -1,26 +1,18 @@
 # eslint-plugin-templates
 
-> ESLint plugin that enforces structural conformance of files against declarative templates.
+[![npm](https://img.shields.io/npm/v/eslint-plugin-templates.svg)](https://www.npmjs.com/package/eslint-plugin-templates)
+[![CI](https://img.shields.io/github/actions/workflow/status/TerryTsai/eslint-plugin-templates/ci.yml?branch=main)](https://github.com/TerryTsai/eslint-plugin-templates/actions)
+[![License: MIT](https://img.shields.io/npm/l/eslint-plugin-templates.svg)](./LICENSE)
 
-Files matched by a configured glob must structurally match a template's body, modulo named variables. The template *is* the canonical example of what a conforming file looks like — reading the template tells the author (or AI agent) exactly what shape the code should take.
-
-## Why
-
-Modules drift. A directory that started uniform — every file an `imports → types → functions` triplet — gradually grows files with leaked helpers, inline configs, and "just one more thing" abstractions. AI coding agents accelerate this by adding helpful-looking changes that conform to no shared shape.
-
-Most existing structural linting tools take a "find this pattern" model. This plugin inverts that: the template describes the **whole file**, and anything not accounted for is a violation. The closed vocabulary of refinements is intentional — it keeps templates legible to agents reading them cold, which is the design's primary user.
+ESLint plugin for matching files against declarative templates. You describe what a file should look like; the linter enforces that shape across your codebase. Useful where similar files share a structure — feature folders, route handlers, reducers.
 
 ## Install
 
 ```sh
-npm install --save-dev eslint eslint-plugin-templates
+npm install --save-dev eslint eslint-plugin-templates @typescript-eslint/parser
 ```
 
-For TypeScript files you'll also want `@typescript-eslint/parser`:
-
-```sh
-npm install --save-dev @typescript-eslint/parser
-```
+Requires ESLint 8 or later.
 
 ## Quick start
 
@@ -29,169 +21,217 @@ npm install --save-dev @typescript-eslint/parser
 import templates from "eslint-plugin-templates";
 import tsParser from "@typescript-eslint/parser";
 
+export default [{
+  files: ["src/handlers/*.ts"],
+  languageOptions: { parser: tsParser },
+  plugins: { templates },
+  rules: {
+    "templates/match": ["error", {
+      id: "handler",
+      body: "${IMPORTS}\n${HANDLER}",
+      slots: {
+        IMPORTS: { type: "ImportDeclaration", minOccurs: 0 },
+        HANDLER: { type: "FunctionDeclaration", exported: true, async: true },
+      },
+    }],
+  },
+}];
+```
+
+Every file in `src/handlers/` must be zero or more imports followed by one exported async function. Anything else — a stray `const`, a second function, a top-level `console.log` — fails the lint.
+
+`body` uses `${SLOT}` placeholders for the parts that vary. Pass it as a regular string, not a JavaScript template literal — `` `${SLOT}` `` would interpolate at config-load time.
+
+## Rules
+
+Two rules. Templates describe what's allowed; `forbid` rejects what isn't.
+
+- **`templates/match`** — match a file against a template
+- **`templates/forbid`** — reject every file the rule's glob covers
+
+## `templates/match`
+
+The rule's options are the template:
+
+```ts
+type MatchTemplate = {
+  id: string;
+  body: string;
+  slots?: Record<string, Slot>;
+};
+```
+
+The matcher walks the template's AST against the file's AST in lockstep. Literal AST in the template must match exactly; `${SLOT}` placeholders in the body consume zero or more file nodes per the slot's type, cardinality, and refinements. Anything in the file not accounted for fails the lint.
+
+### Slot variants
+
+Five variants, each typed by AST kind with its own refinements:
+
+| Variant | `type` values | Refinements |
+|---|---|---|
+| `ImportSlot` | `ImportDeclaration` | `typeOnly`, `fromPath`, `named` |
+| `FunctionSlot` | `FunctionDeclaration`, `ArrowFunction`, `FunctionExpression`, `MethodDeclaration`, `MethodSignature` | `async`, `arity`, `returnsKind`, `exported`, `default`, `named` |
+| `PropertySlot` | `PropertyAssignment`, `PropertySignature`, `PropertyDeclaration` | `valueKind`, `optional`, `readonly`, `named` |
+| `LiteralSlot` | `StringLiteral`, `NumericLiteral` | `matches`, `named` |
+| `AnySlot` | any other kind, or array of kinds | `named` |
+
+`AnySlot` is the fallback for kinds without specialized refinements (`ClassDeclaration`, `TSInterfaceDeclaration`, `VariableDeclaration`, etc.) and for matching multiple kinds at once via array `type`. The schema rejects cross-variant mismatches at config-load time — an `ImportSlot` with an `arity` field, for example, won't validate.
+
+### Refinements
+
+| Refinement | Variant | Type | Checks |
+|---|---|---|---|
+| `named` | all | `string \| RegExp` | The node's identifier name |
+| `typeOnly` | `ImportSlot` | `boolean` | `import type { … }` syntax |
+| `fromPath` | `ImportSlot` | `string` | Exact match on import source |
+| `async` | `FunctionSlot` | `boolean` | The `async` flag |
+| `arity` | `FunctionSlot` | `number` | `params.length` |
+| `returnsKind` | `FunctionSlot` | `NodeKind \| NodeKind[]` | The kind of `returnType.typeAnnotation` |
+| `exported` | `FunctionSlot` | `boolean` | Wrapped in `ExportNamedDeclaration` |
+| `default` | `FunctionSlot` | `boolean` | Wrapped in `ExportDefaultDeclaration` |
+| `valueKind` | `PropertySlot` | `NodeKind \| NodeKind[]` | The kind of the property's value |
+| `optional` | `PropertySlot` | `boolean` | The `optional` flag |
+| `readonly` | `PropertySlot` | `boolean` | The `readonly` flag |
+| `matches` | `LiteralSlot` | `RegExp` | The literal value |
+
+Export-wrapper transparency: `{ type: "FunctionDeclaration" }` matches both `function foo() {}` and `export function foo() {}`. Filter with `exported`/`default`. To match the wrapper itself, use `{ type: "ExportNamedDeclaration" }` via `AnySlot`.
+
+### Cardinality
+
+| Configuration | Meaning |
+|---|---|
+| neither set | exactly 1 |
+| `minOccurs: 0` only | 0 or more |
+| `minOccurs: N` only (N ≥ 1) | N or more |
+| `maxOccurs: M` only | up to M, default min 1 |
+| both | between min and max, inclusive |
+
+### Cross-position binding
+
+The same `${NAME}` placeholder in multiple inline positions unifies on the file's identifier:
+
+```js
+body: "function ${NAME}() {}\nexport { ${NAME} };"
+```
+
+`function foo() {} export { foo };` matches. `function foo() {} export { bar };` triggers `bindingMismatch`.
+
+### Diagnostics
+
+| `messageId` | When |
+|---|---|
+| `divergence` | A literal template node and the file's node have different shapes |
+| `missingRequired` | A slot's `minOccurs` couldn't be satisfied |
+| `refinementFailed` | A node matched the slot's kind but failed a refinement |
+| `bindingMismatch` | A `${NAME}` placeholder used in two positions resolved to different identifiers |
+| `extraContent` | The file has trailing content the template doesn't account for |
+| `unknownSlot` | The body references `${X}` but `slots.X` isn't declared |
+
+[Full reference →](./docs/rules/match.md)
+
+## `templates/forbid`
+
+Always emits a diagnostic on the file. Pair with ESLint's `ignores` to allow-list specific files and reject everything else:
+
+```js
+{
+  files: ["src/services/*/*.ts"],
+  ignores: [
+    "src/services/*/index.ts",
+    "src/services/*/types.ts",
+    "src/services/*/handler-*.ts",
+  ],
+  rules: {
+    "templates/forbid": ["error", {
+      message: "Service folders only contain index.ts, types.ts, and handler-*.ts.",
+    }],
+  },
+}
+```
+
+```ts
+type ForbidOptions = { message?: string };
+```
+
+Default message: `"This file is not allowed in the current scope."`.
+
+[Full reference →](./docs/rules/forbid.md)
+
+## Composing the rules
+
+Combining `match` for content rules with `forbid` for the allow-list:
+
+```js
+import templates from "eslint-plugin-templates";
+import tsParser from "@typescript-eslint/parser";
+
+const base = { languageOptions: { parser: tsParser }, plugins: { templates } };
+
 export default [
+  // Handlers: imports, then one exported async function named handle*
   {
-    files: ["src/features/**/*.ts"],
-    languageOptions: { parser: tsParser },
-    plugins: { templates },
+    ...base,
+    files: ["src/services/*/handler-*.ts"],
     rules: {
-      "templates/file": [
-        "error",
-        {
-          template: {
-            id: "feature",
-            body: "${IMPORTS}\n${FUNCTIONS}",
-            variables: {
-              IMPORTS: { type: "ImportDeclaration", minOccurs: 0 },
-              FUNCTIONS: { type: "FunctionDeclaration", minOccurs: 1 },
-            },
+      "templates/match": ["error", {
+        id: "service-handler",
+        body: "${IMPORTS}\n${HANDLER}",
+        slots: {
+          IMPORTS: { type: "ImportDeclaration", minOccurs: 0 },
+          HANDLER: {
+            type: "FunctionDeclaration",
+            exported: true,
+            async: true,
+            named: /^handle/,
           },
         },
-      ],
+      }],
+    },
+  },
+
+  // types.ts: only interfaces and type aliases
+  {
+    ...base,
+    files: ["src/services/*/types.ts"],
+    rules: {
+      "templates/match": ["error", {
+        id: "service-types",
+        body: "${TYPES}",
+        slots: {
+          TYPES: {
+            type: ["TSInterfaceDeclaration", "TSTypeAliasDeclaration"],
+            minOccurs: 1,
+          },
+        },
+      }],
+    },
+  },
+
+  // Anything else in a service folder is rejected
+  {
+    ...base,
+    files: ["src/services/*/*.ts"],
+    ignores: [
+      "src/services/*/handler-*.ts",
+      "src/services/*/types.ts",
+      "src/services/*/index.ts",
+    ],
+    rules: {
+      "templates/forbid": ["error", {
+        message: "Service folders only contain handler-*.ts, types.ts, and index.ts.",
+      }],
     },
   },
 ];
 ```
 
-The above enforces: every file under `src/features/**/*.ts` consists of zero or more import declarations followed by one or more function declarations — nothing else. A `const x = 1;` at the top level fails the lint.
+## Limitations
 
-> **Note on `${...}`:** template bodies use `${VAR}` syntax for placeholders. Always pass the body as a **regular string**, not a JS template literal — `"${IMPORTS}"` is correct; `` `${IMPORTS}` `` would try to interpolate at JS-parse time.
-
-## Examples
-
-### Server handler file
-
-```js
-{
-  template: {
-    id: "handler",
-    body: "${IMPORTS}\n${HANDLER}",
-    variables: {
-      IMPORTS: { type: "ImportDeclaration", minOccurs: 1 },
-      HANDLER: {
-        type: "FunctionDeclaration",
-        async: true,
-        exported: true,
-        named: /^handle[A-Z]/,
-      },
-    },
-  },
-}
-```
-
-Each handler file must have at least one import and an `export async function handleX()` matching the camelCase pattern.
-
-### React component file
-
-```js
-{
-  template: {
-    id: "component",
-    body: "${IMPORTS}\n${COMPONENT}",
-    variables: {
-      IMPORTS: { type: "ImportDeclaration", minOccurs: 1 },
-      COMPONENT: {
-        type: "FunctionDeclaration",
-        default: true,
-        named: /^[A-Z]/,
-      },
-    },
-  },
-}
-```
-
-Forces a default-exported, PascalCase function component as the file's payload.
-
-### Types-only file
-
-```js
-{
-  template: {
-    id: "types",
-    body: "${TYPES}",
-    variables: {
-      TYPES: {
-        type: ["TSInterfaceDeclaration", "TSTypeAliasDeclaration"],
-        minOccurs: 1,
-        maxOccurs: 50,
-      },
-    },
-  },
-}
-```
-
-Files in the types directory must contain only interfaces and type aliases — no functions, no consts, no imports.
-
-### Reducer file with cross-position binding
-
-```js
-{
-  template: {
-    id: "reducer",
-    body: "${IMPORTS}\nfunction ${NAME}(state, action) {}\nexport { ${NAME} };",
-    variables: {
-      IMPORTS: { type: "ImportDeclaration", minOccurs: 0 },
-    },
-  },
-}
-```
-
-The same `${NAME}` placeholder appears twice — the matcher unifies them. The function name and the exported identifier must agree.
-
-### Type-only imports for declaration files
-
-```js
-{
-  template: {
-    id: "declarations",
-    body: "${TYPE_IMPORTS}\n${TYPES}",
-    variables: {
-      TYPE_IMPORTS: { type: "ImportDeclaration", typeOnly: true, minOccurs: 0 },
-      TYPES: { type: "TSInterfaceDeclaration", minOccurs: 1 },
-    },
-  },
-}
-```
-
-`typeOnly: true` requires `import type { ... }` syntax. A regular `import { ... }` fails.
-
-### Configuration export with constrained keys
-
-```js
-{
-  template: {
-    id: "config",
-    body: "export default ${CONFIG};",
-    variables: {
-      CONFIG: { type: "ObjectExpression" },
-    },
-  },
-}
-```
-
-Forces the file to be a single default export of an object literal.
-
-## Diagnostics
-
-The rule emits one of six message IDs:
-
-| ID | When |
-|---|---|
-| `divergence` | A literal template node and the file's node have different shapes. |
-| `missingRequired` | A variable's `minOccurs` couldn't be satisfied — no kind-matching nodes were found. |
-| `refinementFailed` | A node matched the variable's kind but failed a refinement (e.g. `fromPath`, `named`, `arity`). |
-| `bindingMismatch` | A `${NAME}` placeholder used in two positions resolved to different identifiers. |
-| `extraContent` | The file has trailing content the template doesn't account for. |
-| `unknownVariable` | The template body references `${X}` but `variables.X` isn't declared. |
-
-See [docs/rules/file.md](./docs/rules/file.md) for the full configuration reference, all 12 refinements, and the supported node-kind table.
-
-## Comparison with `eslint-plugin-project-structure`
-
-`eslint-plugin-project-structure` solves a similar problem with selector-and-config-based rules — you describe the file's shape via a configuration object listing allowed elements. This plugin solves it with **template-and-example-based** rules — you write what a conforming file looks like, with `${VARS}` for the parts that legitimately vary.
-
-Different authoring models for different team preferences. If you'd rather configure a list of allowed top-level statements, `project-structure` is great. If you'd rather show an example and have the matcher enforce it, this is yours.
+- One template per `templates/match` rule invocation. Use multiple ESLint config blocks with different `files` globs to apply different templates to different parts of the codebase.
+- No autofix.
+- No type-resolved checks; everything is syntactic.
+- `templates/forbid` only sees files ESLint lints. To catch non-JS/TS files (`*.md`, `*.json`, etc.), extend ESLint's parser configuration to those file types.
 
 ## License
 
-[MIT](./LICENSE)
+MIT

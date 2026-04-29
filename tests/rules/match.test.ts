@@ -1,8 +1,8 @@
 import * as parser from "@typescript-eslint/parser";
 import { RuleTester } from "@typescript-eslint/rule-tester";
 import { afterAll, describe, it } from "vitest";
-import { rule } from "../../src/rules/file";
-import type { FileTemplate } from "../../src/types";
+import { rule } from "../../src/rules/match";
+import type { MatchTemplate } from "../../src/types";
 
 RuleTester.afterAll = afterAll;
 RuleTester.it = it;
@@ -16,39 +16,39 @@ const ruleTester = new RuleTester({
   },
 });
 
-const featureTemplate: FileTemplate = {
+const featureTemplate: MatchTemplate = {
   id: "feature",
   body: "${IMPORTS}\n${FUNCTIONS}",
-  variables: {
+  slots: {
     IMPORTS: { type: "ImportDeclaration", minOccurs: 0 },
     FUNCTIONS: { type: "FunctionDeclaration", minOccurs: 1 },
   },
 };
 
-ruleTester.run("file", rule, {
+ruleTester.run("match", rule, {
   valid: [
     {
       name: "imports + functions in declared order",
       code: `import { a } from "a";\nimport { b } from "b";\nfunction hello() {}\nfunction goodbye() {}`,
-      options: [{ template: featureTemplate }],
+      options: [featureTemplate],
     },
     {
       name: "no imports allowed when IMPORTS is minOccurs:0",
       code: `function hello() {}`,
-      options: [{ template: featureTemplate }],
+      options: [featureTemplate],
     },
   ],
   invalid: [
     {
       name: "missing required functions reports missingRequired",
       code: `import { a } from "a";`,
-      options: [{ template: featureTemplate }],
+      options: [featureTemplate],
       errors: [{ messageId: "missingRequired" }],
     },
     {
       name: "forbidden top-level node breaks the sequence",
       code: `import { a } from "a";\nconst x = 1;\nfunction hello() {}`,
-      options: [{ template: featureTemplate }],
+      options: [featureTemplate],
       errors: [{ messageId: "missingRequired" }],
     },
     {
@@ -56,31 +56,27 @@ ruleTester.run("file", rule, {
       code: `function hello() {}\nconst leftover = 1;`,
       options: [
         {
-          template: {
-            id: "feature",
-            body: "${FUNCTIONS}",
-            variables: { FUNCTIONS: { type: "FunctionDeclaration", minOccurs: 1 } },
-          },
+          id: "feature",
+          body: "${FUNCTIONS}",
+          slots: { FUNCTIONS: { type: "FunctionDeclaration", minOccurs: 1 } },
         },
       ],
       errors: [{ messageId: "extraContent" }],
     },
     {
-      name: "placeholder without a matching variable definition",
+      name: "placeholder without a matching slot definition",
       code: `function hello() {}`,
-      options: [{ template: { id: "feature", body: "${MISSING}" } }],
-      errors: [{ messageId: "unknownVariable", data: { name: "MISSING", templateId: "feature" } }],
+      options: [{ id: "feature", body: "${MISSING}" }],
+      errors: [{ messageId: "unknownSlot", data: { name: "MISSING", templateId: "feature" } }],
     },
     {
       name: "named refinement: function name does not match regex",
       code: `function destroyWidget() {}`,
       options: [
         {
-          template: {
-            id: "feature",
-            body: "${FN}",
-            variables: { FN: { type: "FunctionDeclaration", named: /^create/ } },
-          },
+          id: "feature",
+          body: "${FN}",
+          slots: { FN: { type: "FunctionDeclaration", named: /^create/ } },
         },
       ],
       errors: [{ messageId: "refinementFailed" }],
@@ -90,11 +86,9 @@ ruleTester.run("file", rule, {
       code: `import { foo } from "vue";`,
       options: [
         {
-          template: {
-            id: "feature",
-            body: "${REACT}",
-            variables: { REACT: { type: "ImportDeclaration", fromPath: "react" } },
-          },
+          id: "feature",
+          body: "${REACT}",
+          slots: { REACT: { type: "ImportDeclaration", fromPath: "react" } },
         },
       ],
       errors: [{ messageId: "refinementFailed" }],
@@ -102,7 +96,7 @@ ruleTester.run("file", rule, {
     {
       name: "missing kind entirely still reports missingRequired (no refinement to blame)",
       code: ``,
-      options: [{ template: featureTemplate }],
+      options: [featureTemplate],
       errors: [{ messageId: "missingRequired" }],
     },
     {
@@ -110,10 +104,8 @@ ruleTester.run("file", rule, {
       code: `function helloWorld() {}\nexport { goodbye };`,
       options: [
         {
-          template: {
-            id: "feature",
-            body: "function ${NAME}() {}\nexport { ${NAME} };",
-          },
+          id: "feature",
+          body: "function ${NAME}() {}\nexport { ${NAME} };",
         },
       ],
       errors: [{ messageId: "bindingMismatch" }],

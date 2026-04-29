@@ -2,7 +2,7 @@ import { parse } from "@typescript-eslint/typescript-estree";
 import { describe, expect, it } from "vitest";
 import { matchProgram } from "../../src/matcher/match";
 import { parseTemplate } from "../../src/matcher/parse-template";
-import type { Variable } from "../../src/types";
+import type { Slot } from "../../src/types";
 
 function parseFile(source: string) {
   return parse(source, { loc: true, range: true, jsx: false });
@@ -17,11 +17,11 @@ describe("matchProgram", () => {
       function hello() {}
       function goodbye() {}
     `);
-    const variables: Record<string, Variable> = {
+    const slots: Record<string, Slot> = {
       IMPORTS: { type: "ImportDeclaration", minOccurs: 0 },
       FUNCTIONS: { type: "FunctionDeclaration", minOccurs: 1 },
     };
-    const result = matchProgram(tpl, file, variables);
+    const result = matchProgram(tpl, file, slots);
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.bindings["IMPORTS"]).toHaveLength(2);
@@ -32,22 +32,22 @@ describe("matchProgram", () => {
   it("matches a file with no imports when IMPORTS is minOccurs:0", () => {
     const tpl = parseTemplate(`\${IMPORTS}\n\${FUNCTIONS}`);
     const file = parseFile(`function hello() {}`);
-    const variables: Record<string, Variable> = {
+    const slots: Record<string, Slot> = {
       IMPORTS: { type: "ImportDeclaration", minOccurs: 0 },
       FUNCTIONS: { type: "FunctionDeclaration", minOccurs: 1 },
     };
-    const result = matchProgram(tpl, file, variables);
+    const result = matchProgram(tpl, file, slots);
     expect(result.ok).toBe(true);
   });
 
   it("rejects a file missing required functions", () => {
     const tpl = parseTemplate(`\${IMPORTS}\n\${FUNCTIONS}`);
     const file = parseFile(`import { a } from "a";`);
-    const variables: Record<string, Variable> = {
+    const slots: Record<string, Slot> = {
       IMPORTS: { type: "ImportDeclaration", minOccurs: 0 },
       FUNCTIONS: { type: "FunctionDeclaration", minOccurs: 1 },
     };
-    const result = matchProgram(tpl, file, variables);
+    const result = matchProgram(tpl, file, slots);
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.error.messageId).toBe("missingRequired");
@@ -62,31 +62,31 @@ describe("matchProgram", () => {
       const x = 1;
       function hello() {}
     `);
-    const variables: Record<string, Variable> = {
+    const slots: Record<string, Slot> = {
       IMPORTS: { type: "ImportDeclaration", minOccurs: 0 },
       FUNCTIONS: { type: "FunctionDeclaration", minOccurs: 1 },
     };
-    const result = matchProgram(tpl, file, variables);
+    const result = matchProgram(tpl, file, slots);
     expect(result.ok).toBe(false);
   });
 
   it("respects maxOccurs as upper bound", () => {
     const tpl = parseTemplate(`\${FUNCTIONS}`);
     const file = parseFile(`function a(){} function b(){}`);
-    const variables: Record<string, Variable> = {
+    const slots: Record<string, Slot> = {
       FUNCTIONS: { type: "FunctionDeclaration", minOccurs: 1, maxOccurs: 1 },
     };
-    const result = matchProgram(tpl, file, variables);
+    const result = matchProgram(tpl, file, slots);
     expect(result.ok).toBe(false);
   });
 
-  it("reports unknownVariable for placeholders without a matching variable definition", () => {
+  it("reports unknownSlot for placeholders without a matching slot definition", () => {
     const tpl = parseTemplate(`\${MISSING}`);
     const file = parseFile(``);
     const result = matchProgram(tpl, file, {});
     expect(result.ok).toBe(false);
     if (!result.ok) {
-      expect(result.error.messageId).toBe("unknownVariable");
+      expect(result.error.messageId).toBe("unknownSlot");
     }
   });
 
@@ -96,10 +96,10 @@ describe("matchProgram", () => {
       const x = 1;
       function f() {}
     `);
-    const variables: Record<string, Variable> = {
+    const slots: Record<string, Slot> = {
       ANY: { type: ["VariableDeclaration", "FunctionDeclaration"], minOccurs: 1, maxOccurs: 10 },
     };
-    const result = matchProgram(tpl, file, variables);
+    const result = matchProgram(tpl, file, slots);
     expect(result.ok).toBe(true);
   });
 

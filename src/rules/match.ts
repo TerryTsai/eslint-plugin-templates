@@ -1,12 +1,8 @@
-import { ESLintUtils } from "@typescript-eslint/utils";
 import { matchProgram, type MatchMessageId } from "../matcher/match";
 import { parseTemplate, type ParsedTemplate } from "../matcher/parse-template";
-import type { FileRuleOptions } from "../types";
-import { fileRuleSchema } from "./file.schema";
-
-const createRule = ESLintUtils.RuleCreator(
-  (name) => `https://github.com/TerryTsai/eslint-plugin-templates/blob/main/docs/rules/${name}.md`,
-);
+import type { MatchTemplate } from "../types";
+import { createRule } from "./_common";
+import { matchRuleSchema } from "./match.schema";
 
 const messages: Record<MatchMessageId, string> = {
   divergence:
@@ -19,30 +15,32 @@ const messages: Record<MatchMessageId, string> = {
     'File diverges from template "{{templateId}}": "{{name}}" was bound to "{{bound}}" earlier but found "{{got}}" here.',
   extraContent:
     'File diverges from template "{{templateId}}": unexpected {{found}} after the last template position.',
-  unknownVariable:
-    'Template "{{templateId}}" references variable "{{name}}" that is not declared in `variables`.',
+  unknownSlot:
+    'Template "{{templateId}}" references slot "{{name}}" that is not declared in `slots`.',
 };
 
 const parsedCache = new WeakMap<object, ParsedTemplate>();
 
-export const rule = createRule<[FileRuleOptions], MatchMessageId>({
-  name: "file",
+function getParsed(template: MatchTemplate): ParsedTemplate {
+  let parsed = parsedCache.get(template);
+  if (!parsed) parsedCache.set(template, (parsed = parseTemplate(template.body)));
+  return parsed;
+}
+
+export const rule = createRule<[MatchTemplate], MatchMessageId>({
+  name: "match",
   meta: {
     type: "problem",
-    docs: { description: "Enforce that files conform to a declared structural template." },
-    schema: fileRuleSchema,
+    docs: { description: "Enforce that files match a declared template." },
+    schema: matchRuleSchema,
     messages,
   },
-  defaultOptions: [{ template: { id: "default", body: "" } }],
-  create(context, [{ template }]) {
-    let parsed = parsedCache.get(template);
-    if (!parsed) {
-      parsed = parseTemplate(template.body);
-      parsedCache.set(template, parsed);
-    }
+  defaultOptions: [{ id: "default", body: "" }],
+  create(context, [template]) {
+    const parsed = getParsed(template);
     return {
       Program(node) {
-        const result = matchProgram(parsed, node, template.variables ?? {});
+        const result = matchProgram(parsed, node, template.slots ?? {});
         if (result.ok) return;
         const { messageId, data, node: errorNode } = result.error;
         context.report({

@@ -1,5 +1,5 @@
 import { TSESTree } from "@typescript-eslint/typescript-estree";
-import type { Variable } from "../types";
+import type { Slot } from "../types";
 import { describeKind, nodeMatchesKind } from "./kind-mapping";
 import { getStatementPlaceholder, placeholderName, type ParsedTemplate } from "./parse-template";
 import { applyRefinements } from "./refinements";
@@ -9,7 +9,7 @@ export type MatchMessageId =
   | "missingRequired"
   | "refinementFailed"
   | "bindingMismatch"
-  | "unknownVariable"
+  | "unknownSlot"
   | "extraContent";
 
 export interface MatchError {
@@ -41,18 +41,18 @@ interface Cardinality {
   max: number;
 }
 
-function cardinalityOf(variable: Variable): Cardinality {
-  const min = variable.minOccurs ?? 1;
-  const max = variable.maxOccurs ?? (variable.minOccurs === undefined ? 1 : Infinity);
+function cardinalityOf(slot: Slot): Cardinality {
+  const min = slot.minOccurs ?? 1;
+  const max = slot.maxOccurs ?? (slot.minOccurs === undefined ? 1 : Infinity);
   return { min, max };
 }
 
 export function matchProgram(
   template: ParsedTemplate,
   fileAst: TSESTree.Program,
-  variables: Record<string, Variable>,
+  slots: Record<string, Slot>,
 ): MatchResult {
-  return matchSequence(template.ast.body, fileAst.body, variables, fileAst);
+  return matchSequence(template.ast.body, fileAst.body, slots, fileAst);
 }
 
 interface BindingContext {
@@ -63,7 +63,7 @@ interface BindingContext {
 function matchSequence(
   templateNodes: readonly TSESTree.Node[],
   fileNodes: readonly TSESTree.Node[],
-  variables: Record<string, Variable>,
+  slots: Record<string, Slot>,
   fallback: TSESTree.Node,
 ): MatchResult {
   const bindings: Record<string, TSESTree.Node[]> = {};
@@ -74,7 +74,7 @@ function matchSequence(
     const placeholder = getStatementPlaceholder(tnode);
 
     if (placeholder !== null) {
-      const result = consumePlaceholder(placeholder, variables, fileNodes, fi, fallback);
+      const result = consumePlaceholder(placeholder, slots, fileNodes, fi, fallback);
       if (!result.ok) return result;
       bindings[placeholder] = result.matched;
       fi = result.nextIndex;
@@ -110,23 +110,23 @@ interface ConsumeSuccess {
 
 function consumePlaceholder(
   name: string,
-  variables: Record<string, Variable>,
+  slots: Record<string, Slot>,
   fileNodes: readonly TSESTree.Node[],
   startIndex: number,
   fallback: TSESTree.Node,
 ): ConsumeSuccess | MatchFailure {
-  const variable = variables[name];
-  if (!variable) return fail("unknownVariable", { name }, fallback);
+  const slot = slots[name];
+  if (!slot) return fail("unknownSlot", { name }, fallback);
 
-  const { min, max } = cardinalityOf(variable);
+  const { min, max } = cardinalityOf(slot);
   const matched: TSESTree.Node[] = [];
   let lastRefinementFail: { node: TSESTree.Node; refinement: string } | null = null;
   let i = startIndex;
 
   while (i < fileNodes.length && matched.length < max) {
     const fnode = fileNodes[i]!;
-    if (!nodeMatchesKind(fnode, variable.type)) break;
-    const result = applyRefinements(fnode, variable);
+    if (!nodeMatchesKind(fnode, slot.type)) break;
+    const result = applyRefinements(fnode, slot);
     if (!result.ok) {
       lastRefinementFail = { node: fnode, refinement: result.failed };
       break;
@@ -136,7 +136,7 @@ function consumePlaceholder(
   }
 
   if (matched.length < min) {
-    const type = describeKind(variable.type);
+    const type = describeKind(slot.type);
     if (lastRefinementFail) {
       const { node, refinement } = lastRefinementFail;
       return fail("refinementFailed", { name, type, refinement }, node);

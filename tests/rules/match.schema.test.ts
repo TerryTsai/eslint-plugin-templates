@@ -1,13 +1,13 @@
 import Ajv from "ajv";
 import { describe, expect, it } from "vitest";
-import { fileRuleSchema } from "../../src/rules/file.schema";
+import { matchRuleSchema } from "../../src/rules/match.schema";
 
 const ajv = new Ajv({ allErrors: false });
-const validate = ajv.compile(fileRuleSchema[0]!);
+const validate = ajv.compile(matchRuleSchema[0]!);
 
-const valid = (template: unknown): boolean => validate({ template }) as boolean;
-const validWith = (variableX: unknown): boolean =>
-  valid({ id: "x", body: "${X}", variables: { X: variableX } });
+const valid = (template: unknown): boolean => validate(template) as boolean;
+const validWith = (slotX: unknown): boolean =>
+  valid({ id: "x", body: "${X}", slots: { X: slotX } });
 
 describe("schema", () => {
   it("accepts a minimal template", () => {
@@ -24,34 +24,34 @@ describe("schema", () => {
   });
 
   describe("variants", () => {
-    it("accepts ImportVariable with typeOnly + fromPath", () => {
+    it("accepts ImportSlot with typeOnly + fromPath", () => {
       expect(validWith({ type: "ImportDeclaration", typeOnly: true, fromPath: "react" })).toBe(true);
     });
 
-    it("rejects ImportVariable with FunctionVariable refinement", () => {
+    it("rejects ImportSlot with FunctionSlot refinement", () => {
       expect(validWith({ type: "ImportDeclaration", arity: 2 })).toBe(false);
     });
 
-    it("accepts FunctionVariable across all five function-like kinds", () => {
+    it("accepts FunctionSlot across all five function-like kinds", () => {
       const kinds = ["FunctionDeclaration", "ArrowFunction", "FunctionExpression", "MethodDeclaration", "MethodSignature"];
       for (const k of kinds) {
         expect(validWith({ type: k, async: true, arity: 0 })).toBe(true);
       }
     });
 
-    it("rejects FunctionVariable with valueKind (PropertyVariable refinement)", () => {
+    it("rejects FunctionSlot with valueKind (PropertySlot refinement)", () => {
       expect(validWith({ type: "FunctionDeclaration", valueKind: "Literal" })).toBe(false);
     });
 
-    it("accepts LiteralVariable with matches", () => {
+    it("accepts LiteralSlot with matches", () => {
       expect(validWith({ type: "StringLiteral", matches: /foo/ })).toBe(true);
     });
 
-    it("accepts AnyVariable with non-specialized kind", () => {
+    it("accepts AnySlot with non-specialized kind", () => {
       expect(validWith({ type: "VariableDeclaration", minOccurs: 0 })).toBe(true);
     });
 
-    it("accepts AnyVariable with array of kinds", () => {
+    it("accepts AnySlot with array of kinds", () => {
       expect(validWith({ type: ["VariableDeclaration", "FunctionDeclaration"] })).toBe(true);
     });
 

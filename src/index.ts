@@ -1,8 +1,9 @@
-import { rule as fileRule } from "./rules/file";
+import { rule as forbidRule } from "./rules/forbid";
+import { rule as matchRule } from "./rules/match";
 
 const plugin = {
-  meta: { name: "eslint-plugin-templates", version: "0.1.0-dev" },
-  rules: { file: fileRule },
+  meta: { name: "eslint-plugin-templates", version: "0.1.0" },
+  rules: { match: matchRule, forbid: forbidRule },
 };
 
 export = plugin;
