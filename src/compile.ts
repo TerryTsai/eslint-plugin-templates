@@ -1,5 +1,5 @@
 import { type NodeMatcher, type ObjectMatcher } from "./match/types";
-import { bind } from "./matcher";
+import { bind } from "./matcher/common";
 
 const PLACEHOLDER_REGEX = /\{\{([A-Z_][A-Z0-9_]*)\}\}/g;
 const PREFIX = "__TEMPLATE_VAR_";

@@ -72,7 +72,7 @@ The first occurrence binds; subsequent occurrences must agree.
 ## Type-safe authoring
 
 ```ts
-import { matcher } from "eslint-plugin-templates";
+import { matcher } from "eslint-plugin-templates/tsparser";
 import { type TSESTree } from "@typescript-eslint/utils";
 
 const m = matcher<TSESTree.FunctionDeclaration>({

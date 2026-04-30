@@ -7,6 +7,7 @@ import { barrelTemplate } from "./eslint/barrelTemplate.mjs";
 import { constantTemplate } from "./eslint/constantTemplate.mjs";
 import { entryTemplate } from "./eslint/entryTemplate.mjs";
 import { eslintConfigTemplate } from "./eslint/eslintConfigTemplate.mjs";
+import { kitTemplate } from "./eslint/kitTemplate.mjs";
 import { moduleTemplate } from "./eslint/moduleTemplate.mjs";
 import { typesTemplate } from "./eslint/typesTemplate.mjs";
 
@@ -69,7 +70,6 @@ export default [
       content: {
         "index.ts": entryTemplate,
         "compile.ts": moduleTemplate,
-        "matcher.ts": barrelTemplate,
         "layout.ts": barrelTemplate,
         "config.ts": barrelTemplate,
         "plugin.ts": constantTemplate,
@@ -77,6 +77,12 @@ export default [
           content: {
             "types.ts": typesTemplate,
             "*.ts": moduleTemplate,
+          },
+        },
+        "matcher/": {
+          content: {
+            "common.ts": barrelTemplate,
+            "tsparser.ts": kitTemplate,
           },
         },
       },

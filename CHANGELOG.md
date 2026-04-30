@@ -1,5 +1,40 @@
 # Changelog
 
+## 0.6.0
+
+Adds a TSESTree-flavored helper kit for building matchers without hand-rolling AST shapes.
+
+### New
+
+- **`eslint-plugin-templates/tsparser`** — 25+ helpers, each typed against the specific TSESTree node it produces:
+  - Wrappers: `exportNamedDecl`, `exportDefaultDecl`, `exportAllDecl`, `importDecl`
+  - Declarations: `functionDecl`, `arrowFunctionExpr`, `classDecl`, `variableDecl`, `typeAliasDecl`, `interfaceDecl`, `enumDecl`, `moduleDecl`
+  - Atoms: `identifier`, `literal`, `decorator`
+  - Class members: `methodDef`, `propertyDef`
+  - Expressions: `callExpr`, `newExpr`, `memberExpr`, `awaitExpr`, `spreadElement`
+  - TS types: `typeRef`, `unionType`, `intersectionType`, `literalType`
+  - Plus `matcher<N>` (moved here from the main entry).
+
+```js
+import { exportNamedDecl, classDecl, identifier, decorator, callExpr } from "eslint-plugin-templates/tsparser";
+
+const ctrl = exportNamedDecl(classDecl({
+  id: identifier("OrdersController"),
+  decorators: [decorator(callExpr({ callee: identifier("Controller") }))],
+}));
+```
+
+vs. the equivalent hand-written AST tree (~16 lines of nested `match` objects).
+
+### Moved
+
+- `matcher<N>` → `eslint-plugin-templates/tsparser`. Still re-exported from the main entry for backwards compatibility; prefer the subpath import going forward.
+
+### Internal
+
+- `src/matcher/` folder replaces the single `src/matcher.ts`. `common.ts` houses parser-agnostic tags (`bind`, `regex`); `tsparser.ts` houses the TSESTree helpers.
+- `ValueMatcher<T>` gained an array-element branch — when `T` is an array, `NodeMatcher<E>[]` is now a typed list-pairing form (previously only the alternation form was typed correctly).
+
 ## 0.5.0
 
 **Breaking refactor.** Earlier versions used a closed-vocabulary discriminated union baked around TSESTree (five slot variants × twelve named refinements). v0.5 reverses this: the engine is parser-agnostic and matches by raw AST property, and matchers are pure JSON-serializable data so they survive ESLint v9's flat-config option cloning.

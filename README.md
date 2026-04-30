@@ -157,25 +157,45 @@ When you want one config block instead of a tree:
 - `matchConfig({ files, template, … })` — apply `templates/match` to a glob.
 - `forbidConfig({ files, ignores?, message?, … })` — reject every file the glob covers (use `ignores` to allow-list).
 
-## Type-safe authoring
+## TSESTree helpers
 
-`matcher<N>` is a runtime no-op that narrows `match` against a TSESTree node type:
+`eslint-plugin-templates/tsparser` ships ~25 small helpers that build matchers against TSESTree node shapes — wrappers (`exportNamedDecl`, `importDecl`, …), declarations (`functionDecl`, `classDecl`, `interfaceDecl`, …), atoms (`identifier`, `literal`, `decorator`), class members (`methodDef`, `propertyDef`), expressions (`callExpr`, `memberExpr`, `awaitExpr`, …), and TS types (`typeRef`, `unionType`, …). Each is typed against the AST node it produces:
 
 ```ts
-import { matcher, regex } from "eslint-plugin-templates";
+import { exportNamedDecl, classDecl, decorator, callExpr, identifier } from "eslint-plugin-templates/tsparser";
+
+const controller = {
+  name: "controller",
+  match: compile(`
+    {{IMPORTS}}
+    {{CLASS}}
+  `, {
+    IMPORTS: { min: 1, max: 20, match: { type: "ImportDeclaration" } },
+    CLASS:   exportNamedDecl(classDecl({
+      id: identifier("OrdersController"),
+      decorators: [decorator(callExpr({ callee: identifier("Controller") }))],
+    })),
+  }, parse),
+};
+```
+
+For non-TSESTree parsers, build matchers against the AST shapes the parser produces — the engine doesn't care which parser the helpers were named after.
+
+### Type-safe authoring
+
+`matcher<N>` is a runtime no-op that narrows `match` against a chosen TSESTree node type:
+
+```ts
+import { matcher } from "eslint-plugin-templates/tsparser";
 import { type TSESTree } from "@typescript-eslint/utils";
 
 const m = matcher<TSESTree.FunctionDeclaration>({
   name: "handler",
-  match: {
-    type: "FunctionDeclaration",
-    async: true,
-    id: { match: { type: "Identifier", name: regex("^handle") } },
-  },
+  match: { type: "FunctionDeclaration", async: true },
 });
 ```
 
-Typing `type: "FunctionDeclaration"` narrows the rest of the keys to that node's actual fields. A typo like `arity: 2` fails at compile time.
+A typo like `arity: 2` fails at compile time.
 
 ## Using other parsers
 

@@ -11,6 +11,7 @@ export type ValueMatcher<T = unknown> =
   | T
   | NodeMatcher<T>
   | NodeMatcher<T>[]
+  | (T extends readonly (infer E)[] ? NodeMatcher<E>[] : never)
   | { "@regex": string; flags?: string }
   | { "@bind": string };
 

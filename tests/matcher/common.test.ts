@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { bind } from "../src/matcher";
+import { bind } from "../../src/matcher/common";
 
 describe("bind", () => {
   it("returns a serializable @bind tag", () => {

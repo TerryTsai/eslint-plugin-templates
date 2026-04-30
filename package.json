@@ -1,6 +1,6 @@
 {
   "name": "eslint-plugin-templates",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "Templates for file structure, enforced by ESLint.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -8,6 +8,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    },
+    "./tsparser": {
+      "types": "./dist/matcher/tsparser.d.ts",
+      "default": "./dist/matcher/tsparser.js"
     }
   },
   "files": [

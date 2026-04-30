@@ -2,7 +2,8 @@ import { plugin } from "./plugin";
 
 export { compile } from "./compile";
 export { forbidConfig, layoutConfig, matchConfig } from "./config";
-export { bind, matcher, regex } from "./matcher";
+export { bind, regex } from "./matcher/common";
+export { matcher } from "./matcher/tsparser";
 
 export type {
   Bindings,
