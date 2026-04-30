@@ -1,15 +1,27 @@
+import tsParser from "@typescript-eslint/parser";
+
+import { compile } from "../dist/index.js";
+
+const parse = (src) => tsParser.parseForESLint(src, { ecmaVersion: 2022, sourceType: "module" }).ast;
+
+const SETUP_KINDS = ["VariableDeclaration", "FunctionDeclaration", "TSTypeAliasDeclaration", "TSInterfaceDeclaration"];
+const HELPER_KINDS = ["VariableDeclaration", "FunctionDeclaration", "TSTypeAliasDeclaration", "TSInterfaceDeclaration"];
+
+/**
+ * Default file shape: imports, optional setup, exactly one named export,
+ * optional trailing helpers.
+ */
 export const moduleTemplate = {
-  id: "module",
-  body: `
+  name: "module",
+  match: compile(`
     {{IMPORTS}}
     {{SETUP}}
     {{EXPORTED}}
-    {{INTERNALS}}
-  `,
-  slots: {
-    IMPORTS: { type: "ImportDeclaration", minOccurs: 0, maxOccurs: 13 },
-    SETUP: { type: ["TSTypeAliasDeclaration", "TSInterfaceDeclaration", "VariableDeclaration"], minOccurs: 0, maxOccurs: 5 },
-    EXPORTED: { type: "FunctionDeclaration", exported: true, minOccurs: 1, maxOccurs: 1 },
-    INTERNALS: { type: ["FunctionDeclaration", "VariableDeclaration"], minOccurs: 0, maxOccurs: 7 },
-  },
+    {{HELPERS}}
+  `, {
+    IMPORTS:  { min: 0, max: 5,  match: { type: "ImportDeclaration" } },
+    SETUP:    { min: 0, max: 5,  match: { type: SETUP_KINDS } },
+    EXPORTED: { min: 1, max: 1,  match: { type: "ExportNamedDeclaration" } },
+    HELPERS:  { min: 0, max: 10, match: { type: HELPER_KINDS } },
+  }, parse),
 };

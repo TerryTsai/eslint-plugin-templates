@@ -1,5 +1,5 @@
-import * as path from "node:path";
+import path from "node:path";
 
-export async function handle() {
+export function handler() {
   return path.sep;
 }

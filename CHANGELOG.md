@@ -1,5 +1,77 @@
 # Changelog
 
+## 0.5.0
+
+**Breaking refactor.** Earlier versions used a closed-vocabulary discriminated union baked around TSESTree (five slot variants × twelve named refinements). v0.5 reverses this: the engine is parser-agnostic and matches by raw AST property, and matchers are pure JSON-serializable data so they survive ESLint v9's flat-config option cloning.
+
+### Engine
+
+- `NodeMatcher` — `{ name?, min?, max?, match }` where `match` is an `ObjectMatcher`.
+- `ObjectMatcher<T>` — `{ [K in keyof T]?: ValueMatcher<T[K]> }`, a partial map of AST keys to value matchers.
+- `ValueMatcher<T>` — primitive (equality), `NodeMatcher` (recurse), array (list-pairing or alternation), `{ "@regex" }` (string test), `{ "@bind" }` (cross-position binding). No function form.
+- Single walk over the matcher tree, no privileged keys.
+
+### Public API
+
+```ts
+import {
+  compile,
+  matchConfig, forbidConfig, layoutConfig,
+  bind, regex, matcher,
+  type Layout, type NodeMatcher, type ObjectMatcher, type ValueMatcher,
+} from "eslint-plugin-templates";
+```
+
+- **`compile(template, matchers, parse)`** — parses a template body and substitutes matchers at `{{NAME}}` placeholders. Third argument is any `(source: string) => ast` function — bring your own parser.
+- **`matchConfig`** / **`forbidConfig`** / **`layoutConfig`** — flat-config block builders. `matchConfig` and `forbidConfig` produce one block each; `layoutConfig` expands a `Layout` into many.
+- **`bind(name)`** / **`regex(pattern, flags?)`** — sugar for the `@bind`/`@regex` value-matcher tags.
+- **`matcher<N>(m)`** — runtime no-op that asks TypeScript to narrow `match` against a TSESTree node type `N`.
+
+### Layout
+
+A `Layout` is a plain object literal: optional `closed` plus a `content` map keyed by file (`"foo.ts"`, `"*.ts"`) or folder (`"sub/"`). Folder values are nested `Layout`s. The `Layout<L>` generic validates user literals at compile time — bad keys, value-type mismatches, and stray patterns surface as type errors at the call site.
+
+```js
+{
+  closed: { message: "Service folders only contain index, types, and handlers." },
+  content: {
+    "index.ts": indexTemplate,
+    "types.ts": typesTemplate,
+    "handlers/": { content: { "*.ts": handlerTemplate } },
+  },
+}
+```
+
+`closed` propagates to descendants without their own setting.
+
+### Removed
+
+- Closed-vocabulary slot variants and named refinements.
+- TS-SyntaxKind logical-name layer; v0.5 uses raw `type` strings directly.
+- `defineModule` / `applyModule` / `Module` (renamed) and the `eslint-plugin-templates/config` subpath.
+- Function-valued `ValueMatcher`. Use `bind`/`regex` tags or explicit AST shapes.
+- Combinators (`anyOf`, `allOf`, `not`, `oneOf`). Use array alternation (`[a, b, c]`) at value positions or array list-pairing at array-value positions.
+- Registry workaround (matchers are now pure data, no shim needed).
+- Standalone `layout()` constructor; layouts are plain object literals.
+- Subpaths `/layout` and `/tsestree`; everything is exported from the main entry.
+- Public types `Tree`, `ClosedSpec`, `FlatConfigBlock`. Use ESLint's `TSESLint.FlatConfig.Config` from `@typescript-eslint/utils` for the config-block shape.
+
+### Renames
+
+- `defineModule` / `applyModule` → plain `Layout` literal / `layoutConfig`.
+- `matchBlock` / `forbidBlock` → `matchConfig` / `forbidConfig`.
+- `Module` type → `Layout`.
+- `contents` field → `content`.
+- `closed: true` shorthand → `closed: {}`.
+
+### Migration
+
+- **Templates.** Replace `{ id, body, slots }` with `{ name, match: compile(body, matchers, parse) }`. The parse function is `(src) => parser.parseForESLint(src, opts).ast`.
+- **Layouts.** Replace `defineModule({ contents, closed })` with a plain object `{ closed, content }`. Replace `applyModule({ module, root, parser })` with `layoutConfig({ root, layout, languageOptions: { parser } })`.
+- **Per-block helpers.** `matchBlock` / `forbidBlock` → `matchConfig` / `forbidConfig`.
+- **Refinements.** Spell out the AST shape directly, e.g. `{ type: "ExportNamedDeclaration", declaration: { match: { type: "FunctionDeclaration" } } }` instead of `exported: true`.
+- **Imports.** Drop `eslint-plugin-templates/layout` and `eslint-plugin-templates/tsestree`; everything comes from the main entry.
+
 ## 0.4.0
 
 **Breaking:** `closed` on a `defineModule` now propagates to descendant folders that don't declare their own. Before, `closed` was strictly local. Set it once at the top of a tree and the whole subtree is locked; nested modules with their own `closed` continue to override (different message, different extensions, etc.).

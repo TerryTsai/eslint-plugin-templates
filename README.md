@@ -4,312 +4,214 @@
 [![CI](https://img.shields.io/github/actions/workflow/status/TerryTsai/eslint-plugin-templates/ci.yml?branch=main)](https://github.com/TerryTsai/eslint-plugin-templates/actions)
 [![License: MIT](https://img.shields.io/npm/l/eslint-plugin-templates.svg)](./LICENSE)
 
-ESLint plugin for matching files against declarative templates. Describe what a file should look like; the linter enforces that shape across your codebase. Useful where similar files share a structure — feature folders, route handlers, reducers.
+Templates for file structure, enforced by ESLint.
+
+Codebases tend to grow file-level conventions — every API resource has the same skeleton, every reducer the same shape. Conventions only hold if everyone follows them. This plugin lets you encode the convention as a structural template and lets ESLint hold the rest of the codebase to it.
 
 ## Install
 
 ```sh
-npm install --save-dev eslint eslint-plugin-templates @typescript-eslint/parser
+npm install --save-dev eslint eslint-plugin-templates
 ```
 
-Requires ESLint 8 or later.
+Bring your own parser. Examples below use `@typescript-eslint/parser`; works with any ESLint-compatible parser (`espree`, `@babel/eslint-parser`, `vue-eslint-parser`, …). Requires ESLint 8 or later.
 
-## Quick start
+## Example
+
+Suppose every API resource folder follows the same shape:
+
+```
+src/api/
+├── orders/
+│   ├── orders.controller.ts
+│   ├── orders.service.ts
+│   └── orders.routes.ts
+└── users/
+    ├── users.controller.ts
+    ├── users.service.ts
+    └── users.routes.ts
+```
+
+A controller looks like:
+
+```ts
+import { Controller, Get } from "@nestjs/common";
+import { OrdersService } from "./orders.service";
+
+interface CreateOrderDto { /* ... */ }
+
+@Controller("orders")
+export class OrdersController {
+  constructor(private readonly orders: OrdersService) {}
+  // ...
+}
+```
+
+Encode that shape and apply it across every resource folder:
 
 ```js
 // eslint.config.js
-import templates from "eslint-plugin-templates";
+import templates, { compile, layoutConfig } from "eslint-plugin-templates";
 import tsParser from "@typescript-eslint/parser";
 
-export default [{
-  files: ["src/handlers/*.ts"],
-  languageOptions: { parser: tsParser },
-  plugins: { templates },
-  rules: {
-    "templates/match": ["error", {
-      id: "handler",
-      body: `
-        {{IMPORTS}}
-        {{HANDLER}}
-      `,
-      slots: {
-        IMPORTS: { type: "ImportDeclaration", minOccurs: 0 },
-        HANDLER: { type: "FunctionDeclaration", exported: true, async: true },
-      },
-    }],
-  },
-}];
-```
+const parse = (src) => tsParser.parseForESLint(src, { ecmaVersion: 2022, sourceType: "module" }).ast;
 
-Every file in `src/handlers/` must be zero or more imports followed by one exported async function. Anything else fails the lint.
-
-## Body
-
-The `body` is parsed as TypeScript. Three building blocks combine:
-
-- **Statement-level placeholders** — `{{SLOT}}` on its own line consumes file statements per the slot's type, cardinality, and refinements.
-- **Literal AST** — non-placeholder code must appear in the file as-is.
-- **Inline placeholders** — `{{NAME}}` in an expression or identifier position binds to the Identifier in that position. A later `{{NAME}}` must agree, or `bindingMismatch` fires.
-
-```js
-{
-  id: "express-resource",
-  body: `
-    import express from "express";
+const controller = {
+  name: "controller",
+  match: compile(`
     {{IMPORTS}}
+    {{DTOS}}
+    {{CLASS}}
+  `, {
+    IMPORTS: { min: 1, max: 20, match: { type: "ImportDeclaration" } },
+    DTOS:    { min: 0, max: 10, match: { type: ["TSTypeAliasDeclaration", "TSInterfaceDeclaration"] } },
+    CLASS:   { match: {
+      type: "ExportNamedDeclaration",
+      declaration: { match: { type: "ClassDeclaration" } },
+    } },
+  }, parse),
+};
 
-    export const router = express.Router();
+const service = /* analogous */;
+const routes  = /* analogous */;
 
-    {{ROUTES}}
-
-    {{HANDLERS}}
-  `,
-  slots: {
-    IMPORTS:  { type: "ImportDeclaration",  minOccurs: 0, maxOccurs: 10 },
-    ROUTES:   { type: "ExpressionStatement", minOccurs: 1, maxOccurs: 20 },
-    HANDLERS: { type: "FunctionDeclaration", async: true, arity: 2, minOccurs: 1 },
-  },
-}
+export default [
+  ...layoutConfig({
+    root: "src/api/*",
+    layout: {
+      closed: { message: "API resources contain controller, service, and routes only." },
+      content: {
+        "*.controller.ts": controller,
+        "*.service.ts":    service,
+        "*.routes.ts":     routes,
+      },
+    },
+    languageOptions: { parser: tsParser },
+  }),
+];
 ```
 
-Files must:
+A controller with an extra top-level helper fails. A misnamed file (`orders.helpers.ts`) lands outside the layout's allow-list and trips the closed-scope rejection.
 
-- Start with `import express from "express";`.
-- Have zero or more additional imports.
-- Have `export const router = express.Router();`.
-- Register one or more routes (any expression statement).
-- Declare one or more async function handlers, each taking two parameters.
+## How it works
 
-Indentation, blank lines, and comments in the body are ignored.
+### Templates
 
-**Cross-position binding.** The same `{{NAME}}` placeholder in multiple inline positions must resolve to the same identifier:
+A template is a `NodeMatcher` — a structural assertion over an AST node. Pin specific keys to specific values:
 
 ```js
-{
-  id: "exported-fn",
-  body: `
-    function {{NAME}}() {}
-    export { {{NAME}} };
-  `,
-}
-```
-
-`function listUsers() {} export { listUsers };` matches. `function listUsers() {} export { fetchUsers };` triggers `bindingMismatch`.
-
-## Rules
-
-- **`templates/match`** — match a file against a template
-- **`templates/forbid`** — reject every file the rule's glob covers
-
-## `templates/match`
-
-```ts
-type MatchTemplate = {
-  id: string;
-  body: string;
-  slots?: Record<string, Slot>;
+const asyncFn = {
+  match: { type: "FunctionDeclaration", async: true },
 };
 ```
 
-### Slot variants
+For anything bigger, `compile` takes a code snippet, replaces `{{NAME}}` placeholders with matchers from a map, and returns a NodeMatcher tree ready to drop into `match:`.
 
-| Variant | `type` values | Refinements |
-|---|---|---|
-| `ImportSlot` | `ImportDeclaration` | `typeOnly`, `fromPath`, `named` |
-| `FunctionSlot` | `FunctionDeclaration`, `ArrowFunction`, `FunctionExpression`, `MethodDeclaration`, `MethodSignature` | `async`, `arity`, `returnsKind`, `exported`, `default`, `named` |
-| `PropertySlot` | `PropertyAssignment`, `PropertySignature`, `PropertyDeclaration` | `valueKind`, `optional`, `readonly`, `named` |
-| `LiteralSlot` | `StringLiteral`, `NumericLiteral` | `matches`, `named` |
-| `AnySlot` | any other kind, or array of kinds | `named` |
+Inside `match`, each value can be:
 
-`AnySlot` covers kinds without specialized refinements (`ClassDeclaration`, `TSInterfaceDeclaration`, `VariableDeclaration`, etc.) and matches multiple kinds via an array `type`. The schema rejects cross-variant refinements (e.g. `arity` on an `ImportSlot`) at config-load time.
+- a primitive — equality (`async: true`)
+- a NodeMatcher — recurse into a sub-node
+- an array of NodeMatchers — list pairing (when the target is an array) or alternation
+- `{ "@regex": pattern }` — RegExp test against a string target
+- `{ "@bind": name }` — capture-or-check across positions
 
-### Refinements
+`bind(name)` and `regex(pattern, flags?)` build the last two as a convenience.
 
-| Refinement | Variant | Type | Checks |
-|---|---|---|---|
-| `named` | all | `string \| RegExp` | The node's identifier name |
-| `typeOnly` | `ImportSlot` | `boolean` | `import type { … }` syntax |
-| `fromPath` | `ImportSlot` | `string` | Exact match on import source |
-| `async` | `FunctionSlot` | `boolean` | The `async` flag |
-| `arity` | `FunctionSlot` | `number` | `params.length` |
-| `returnsKind` | `FunctionSlot` | `NodeKind \| NodeKind[]` | The kind of `returnType.typeAnnotation` |
-| `exported` | `FunctionSlot` | `boolean` | Wrapped in `ExportNamedDeclaration` |
-| `default` | `FunctionSlot` | `boolean` | Wrapped in `ExportDefaultDeclaration` |
-| `valueKind` | `PropertySlot` | `NodeKind \| NodeKind[]` | The kind of the property's value |
-| `optional` | `PropertySlot` | `boolean` | The `optional` flag |
-| `readonly` | `PropertySlot` | `boolean` | The `readonly` flag |
-| `matches` | `LiteralSlot` | `RegExp` | The literal value |
+### Cross-position binding
 
-`{ type: "FunctionDeclaration" }` matches both `function foo() {}` and `export function foo() {}`. Filter with `exported`/`default`. To match the wrapper itself, use `{ type: "ExportNamedDeclaration" }` via `AnySlot`.
-
-### Cardinality
-
-| Configuration | Meaning |
-|---|---|
-| neither set | exactly 1 |
-| `minOccurs: 0` only | 0 or more |
-| `minOccurs: N` only (N ≥ 1) | N or more |
-| `maxOccurs: M` only | up to M, default min 1 |
-| both | between min and max, inclusive |
-
-### Diagnostics
-
-| `messageId` | When |
-|---|---|
-| `divergence` | A literal template node and the file's node have different shapes |
-| `missingRequired` | A slot's `minOccurs` couldn't be satisfied |
-| `refinementFailed` | A node matched the slot's kind but failed a refinement |
-| `bindingMismatch` | A `{{NAME}}` placeholder used in two positions resolved to different identifiers |
-| `extraContent` | The file has trailing content the template doesn't account for |
-| `unknownSlot` | The body references `{{X}}` but `slots.X` isn't declared |
-
-[Full reference →](./docs/rules/match.md)
-
-## `templates/forbid`
-
-Always emits a diagnostic on the file. Pair with ESLint's `ignores` to allow-list specific files and reject everything else:
+The same `{{NAME}}` placeholder used at multiple identifier positions binds — the first occurrence captures, the rest must agree:
 
 ```js
-{
-  files: ["src/services/*/*.ts"],
-  ignores: [
-    "src/services/*/index.ts",
-    "src/services/*/types.ts",
-    "src/services/*/handler-*.ts",
-  ],
-  rules: {
-    "templates/forbid": ["error", {
-      message: "Service folders only contain index.ts, types.ts, and handler-*.ts.",
-    }],
-  },
-}
+match: compile(`
+  function {{NAME}}() {}
+  export { {{NAME}} };
+`, {}, parse),
 ```
+
+`function listUsers() {} export { listUsers };` matches. `function listUsers() {} export { fetchUsers };` doesn't.
+
+### Layouts
+
+A layout describes a folder. File names map to templates; folder names (trailing `/`) map to nested layouts. `closed` rejects anything not in the allow-list and propagates to descendant folders without their own.
+
+```js
+const apiResource = {
+  closed: { message: "API resources contain controller, service, and routes only." },
+  content: {
+    "*.controller.ts": controller,
+    "*.service.ts":    service,
+    "*.routes.ts":     routes,
+    "validation/": {
+      content: { "*.dto.ts": dto, "*.schema.ts": schema },
+    },
+  },
+};
+```
+
+`layoutConfig({ root, layout, … })` expands a layout into ESLint config blocks rooted at `root`. A glob root (`"src/api/*"`) applies the layout to every matching folder.
+
+### Single-file rules
+
+When you want one config block instead of a tree:
+
+- `matchConfig({ files, template, … })` — apply `templates/match` to a glob.
+- `forbidConfig({ files, ignores?, message?, … })` — reject every file the glob covers (use `ignores` to allow-list).
+
+## Type-safe authoring
+
+`matcher<N>` is a runtime no-op that narrows `match` against a TSESTree node type:
 
 ```ts
-type ForbidOptions = { message?: string };
-```
+import { matcher, regex } from "eslint-plugin-templates";
+import { type TSESTree } from "@typescript-eslint/utils";
 
-Default message: `"This file is not allowed in the current scope."`.
-
-[Full reference →](./docs/rules/forbid.md)
-
-## Composing the rules
-
-```js
-import templates from "eslint-plugin-templates";
-import tsParser from "@typescript-eslint/parser";
-
-const base = { languageOptions: { parser: tsParser }, plugins: { templates } };
-
-export default [
-  {
-    ...base,
-    files: ["src/services/*/handler-*.ts"],
-    rules: {
-      "templates/match": ["error", {
-        id: "service-handler",
-        body: `
-          {{IMPORTS}}
-          {{HANDLER}}
-        `,
-        slots: {
-          IMPORTS: { type: "ImportDeclaration", minOccurs: 0 },
-          HANDLER: {
-            type: "FunctionDeclaration",
-            exported: true,
-            async: true,
-            named: /^handle/,
-          },
-        },
-      }],
-    },
+const m = matcher<TSESTree.FunctionDeclaration>({
+  name: "handler",
+  match: {
+    type: "FunctionDeclaration",
+    async: true,
+    id: { match: { type: "Identifier", name: regex("^handle") } },
   },
-
-  {
-    ...base,
-    files: ["src/services/*/types.ts"],
-    rules: {
-      "templates/match": ["error", {
-        id: "service-types",
-        body: "{{TYPES}}",
-        slots: {
-          TYPES: {
-            type: ["TSInterfaceDeclaration", "TSTypeAliasDeclaration"],
-            minOccurs: 1,
-          },
-        },
-      }],
-    },
-  },
-
-  {
-    ...base,
-    files: ["src/services/*/*.ts"],
-    ignores: [
-      "src/services/*/handler-*.ts",
-      "src/services/*/types.ts",
-      "src/services/*/index.ts",
-    ],
-    rules: {
-      "templates/forbid": ["error", {
-        message: "Service folders only contain handler-*.ts, types.ts, and index.ts.",
-      }],
-    },
-  },
-];
-```
-
-## Modules
-
-For codebases where many folders share the same shape, `eslint-plugin-templates/config` describes the layout once with `defineModule` and applies it with `applyModule`:
-
-```js
-import { applyModule, defineModule } from "eslint-plugin-templates/config";
-import tsParser from "@typescript-eslint/parser";
-
-const apiResourceModule = defineModule({
-  contents: {
-    "router.ts": routerTemplate,
-    "controller.ts": controllerTemplate,
-    "service.ts": serviceTemplate,
-    "model.ts": modelTemplate,
-    "validation/": defineModule({
-      closed: true,
-      contents: {
-        "schema.ts": schemaTemplate,
-        "validators/": { "*.ts": validatorTemplate },
-      },
-    }),
-    "*.test.ts": testTemplate,
-  },
-  closed: { message: "API resources contain only router, controller, service, model, validation, and tests." },
 });
-
-export default [
-  ...applyModule({ module: apiResourceModule, root: "src/api/*", parser: tsParser }),
-  ...applyModule({ module: apiResourceModule, root: "apps/*/api/*", parser: tsParser }),
-];
 ```
 
-`applyModule` expands the tree into one ESLint config block per entry, orders sibling globs by specificity (most-specific wins), and emits a `templates/forbid` block for the folder when `closed` is set.
+Typing `type: "FunctionDeclaration"` narrows the rest of the keys to that node's actual fields. A typo like `arity: 2` fails at compile time.
 
-Tree conventions:
+## Using other parsers
 
-- Keys ending in `/` are folders; their value is a nested tree (or another `defineModule` for folder-local options).
-- Keys without `/` are files — literal names (`"index.ts"`) or single-folder globs (`"*.ts"`, `"*.test.ts"`).
-- Multi-segment keys (`"a/b/c.ts"`) and `**` are rejected; nest folders explicitly.
+`compile`'s third argument is any function `(source: string) => ast`. Wire up whichever parser ESLint supports:
 
-`closed: true` (or `closed: { message, extensions }`) rejects any file in the folder not matched by a direct entry. The setting propagates to descendant folders that don't declare their own — set it once at the top to lock the whole subtree. Default extensions are `["ts"]`.
+```js
+// espree (ESLint's default)
+import * as espree from "espree";
+const parse = (src) => espree.parse(src, { ecmaVersion: 2022, sourceType: "module" });
 
-[Full reference →](./docs/modules.md)
+// @babel/eslint-parser
+import { parseForESLint } from "@babel/eslint-parser";
+const parse = (src) => parseForESLint(src, {
+  requireConfigFile: false,
+  babelOptions: { presets: ["@babel/preset-env"] },
+}).ast;
+
+// vue-eslint-parser (for SFC <script> blocks)
+import { parseForESLint } from "vue-eslint-parser";
+const parse = (src) => parseForESLint(src, { ecmaVersion: 2022, sourceType: "module" }).ast;
+```
+
+The matcher language references AST keys directly, so a template authored against TSESTree won't necessarily port to Babel's AST node shapes — but the engine itself doesn't care which parser produced the tree.
 
 ## Limitations
 
-- One template per `templates/match` rule invocation. Use multiple ESLint config blocks (or a module) with different `files` globs to apply different templates to different parts of the codebase.
-- Modules can reject unwanted files (with `closed`) but can't require missing files to exist.
+- One template per `templates/match` invocation.
+- Layouts can reject unwanted files (`closed`) but can't require missing ones.
 - No autofix.
 - No type-resolved checks; everything is syntactic.
-- `templates/forbid` only sees files ESLint lints. To catch non-JS/TS files (`*.md`, `*.json`, etc.), extend ESLint's parser configuration to those file types.
+
+## Reference
+
+- [`templates/match`](./docs/rules/match.md)
+- [`templates/forbid`](./docs/rules/forbid.md)
+- [Layouts](./docs/layouts.md)
 
 ## License
 

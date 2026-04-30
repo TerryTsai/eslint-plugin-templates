@@ -1,44 +1,35 @@
 # `templates/forbid`
 
-Reject every file matched by the rule's `files` glob. Pair with ESLint's `ignores` to allow-list specific files and reject anything else.
+Reject every file the rule's `files` glob covers. Always emits a single diagnostic per file. Pair with ESLint's `ignores` to allow-list specific files and reject everything else.
 
 ## Configuration
 
 ```ts
-type ForbidOptions = {
-  message?: string;
-};
+type ForbidOptions = { message?: string };
 ```
 
-`message` is the diagnostic text. Default: `"This file is not allowed in the current scope."`.
+Default message: `"This file is not allowed in the current scope."`.
 
 ## Usage
 
 ```js
-{
-  files: ["src/services/*/*.ts"],
+import { forbidConfig } from "eslint-plugin-templates";
+
+forbidConfig({
+  files: "src/services/*/*.ts",
   ignores: [
     "src/services/*/index.ts",
     "src/services/*/types.ts",
     "src/services/*/handler-*.ts",
   ],
-  rules: {
-    "templates/forbid": ["error", {
-      message: "Service folders only contain index.ts, types.ts, and handler-*.ts.",
-    }],
-  },
-}
+  message: "Service folders only contain index.ts, types.ts, and handler-*.ts.",
+});
 ```
 
-Any `.ts` file in `src/services/*/` not on the allow-list triggers `forbidden`.
+## Diagnostic
 
-## Diagnostics
-
-| `messageId` | Message |
-|---|---|
-| `forbidden` | The configured `message`, or the default. |
+Single message ID: `forbidden`. The diagnostic uses the configured `message` (or the default).
 
 ## Limitations
 
-- ESLint only lints files matched by some configured rule's `files` glob. Non-linted files (`.md`, `.json` without a configured parser, etc.) won't trigger this rule.
-- `forbid` has no template — pair with `templates/match` to enforce the content of files you do allow.
+- Only sees files ESLint lints. To catch non-JS/TS files (`*.md`, `*.json`, etc.), extend ESLint's parser configuration to those file types.

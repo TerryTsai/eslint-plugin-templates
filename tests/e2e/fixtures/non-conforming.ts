@@ -1,1 +1,3 @@
-const x = 1;
+export function handler() {}
+
+export class Extra {}

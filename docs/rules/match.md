@@ -1,244 +1,99 @@
 # `templates/match`
 
-Match a file's whole-program shape against a declared template. Files matched by the rule's `files` glob must structurally match the template body, with `{{SLOT}}` placeholders standing in for the parts that vary.
+Match a file's whole-program shape against a `NodeMatcher`. The rule's option is a `NodeMatcher` that walks the file's `Program`.
 
-## Body composition
+## Foundation
 
-The `body` is parsed as TypeScript. Three building blocks combine:
+```ts
+type NodeMatcher<T = unknown> = {
+  name?: string;
+  min?: number;
+  max?: number;
+  match: ObjectMatcher<T>;
+};
+```
 
-### Statement-level placeholders
+- `name` is the diagnostic label.
+- `min` / `max` are cardinality bounds, only meaningful at list positions (e.g. inside a `body: [...]` array).
+- `match` is an `ObjectMatcher<T>` — a partial map from each key of `T` to a `ValueMatcher`.
 
-`{{SLOT}}` on its own line consumes file statements per the slot's `type`, cardinality, and refinements.
+```ts
+type ValueMatcher<T> =
+  | T                                     // primitive equality
+  | NodeMatcher<T>                        // recurse on a sub-node
+  | NodeMatcher<T>[]                      // list-pairing or alternation
+  | { "@regex": string; flags?: string }  // regex test (string targets only)
+  | { "@bind": string };                  // cross-position binding
+```
+
+The engine walks raw AST properties — whatever keys the matcher pins must equal whatever the actual node has at those keys; everything else is unconstrained.
+
+## Building a matcher: `compile`
+
+```ts
+function compile(
+  template: string,
+  matchers: Record<string, NodeMatcher> | undefined,
+  parse: (source: string) => unknown,
+): ObjectMatcher;
+```
+
+Parses `template` with the supplied `parse` function, replaces `{{NAME}}` placeholders with the matchers from the map, and returns the resulting `ObjectMatcher`. Inline `{{NAME}}` (at identifier positions) becomes a `bind(NAME)` tag automatically — cross-position consistency is enforced.
 
 ```js
-body: `
-  {{IMPORTS}}
-  {{EXPORTED}}
-`
+const parse = (src) => tsParser.parseForESLint(src, { ecmaVersion: 2022, sourceType: "module" }).ast;
 ```
-
-### Literal AST
-
-Non-placeholder code in the body must appear in the file as-is. Source location is ignored; everything else is compared.
-
-```js
-body: `
-  import { useState } from "react";
-  {{HOOKS}}
-`
-```
-
-The file must start with that exact import, then satisfy `HOOKS`.
-
-A body with no placeholders requires an exact-shape file:
-
-```js
-body: "export const VERSION = '1.0.0';"
-```
-
-### Inline placeholders
-
-`{{NAME}}` in an expression or identifier position binds to the Identifier in that position. A later `{{NAME}}` must agree, or `bindingMismatch` fires.
-
-```js
-body: `
-  function {{NAME}}() {}
-  export { {{NAME}} };
-`
-```
-
-`function foo() {} export { foo };` matches. `function foo() {} export { bar };` triggers `bindingMismatch`.
-
-A literal shell with an inline placeholder lets you constrain everything *but* the name:
-
-```js
-body: "export function {{NAME}}() { return null; }"
-```
-
-## Configuration
-
-```ts
-type MatchTemplate = {
-  id: string;
-  body: string;
-  slots?: Record<string, Slot>;
-};
-```
-
-All slot variants share base fields:
-
-```ts
-type BaseSlot = {
-  minOccurs?: number;
-  maxOccurs?: number;
-  named?: string | RegExp;
-};
-```
-
-## Variants
-
-### `ImportSlot`
-
-```ts
-type ImportSlot = BaseSlot & {
-  type: "ImportDeclaration";
-  typeOnly?: boolean;
-  fromPath?: string;
-};
-```
-
-`{ type: "ImportDeclaration", typeOnly: true, fromPath: "react" }` matches `import type { … } from "react"`.
-
-### `FunctionSlot`
-
-```ts
-type FunctionSlot = BaseSlot & {
-  type:
-    | "FunctionDeclaration"
-    | "ArrowFunction"
-    | "FunctionExpression"
-    | "MethodDeclaration"
-    | "MethodSignature";
-  async?: boolean;
-  arity?: number;
-  returnsKind?: NodeKind | NodeKind[];
-  exported?: boolean;
-  default?: boolean;
-};
-```
-
-`exported`/`default` check the export wrapper; other refinements check the unwrapped declaration. So `{ type: "FunctionDeclaration" }` matches both `function foo() {}` and `export function foo() {}`.
-
-`{ type: "FunctionDeclaration", exported: true, async: true, named: /^handle/ }` matches `export async function handleX() { … }`.
-
-### `PropertySlot`
-
-```ts
-type PropertySlot = BaseSlot & {
-  type: "PropertyAssignment" | "PropertySignature" | "PropertyDeclaration";
-  valueKind?: NodeKind | NodeKind[];
-  optional?: boolean;
-  readonly?: boolean;
-};
-```
-
-- `PropertyAssignment` — object literal entries (`{ key: value }`)
-- `PropertySignature` — interface/type properties
-- `PropertyDeclaration` — class fields
-
-### `LiteralSlot`
-
-```ts
-type LiteralSlot = BaseSlot & {
-  type: "StringLiteral" | "NumericLiteral";
-  matches?: RegExp;
-};
-```
-
-`matches` is tested against `String(node.value)`.
-
-### `AnySlot`
-
-```ts
-type AnySlot = BaseSlot & {
-  type: NodeKind | NodeKind[];
-};
-```
-
-Fallback for kinds without specialized refinements (`ClassDeclaration`, `TSInterfaceDeclaration`, `VariableDeclaration`, etc.) and for matching multiple kinds via array `type`.
-
-## Refinements
-
-| Refinement | Variant | Type | Checks |
-|---|---|---|---|
-| `named` | all | `string \| RegExp` | The node's identifier name |
-| `typeOnly` | `ImportSlot` | `boolean` | `import type { … }` syntax |
-| `fromPath` | `ImportSlot` | `string` | Exact match on import source |
-| `async` | `FunctionSlot` | `boolean` | The `async` flag |
-| `arity` | `FunctionSlot` | `number` | `params.length` |
-| `returnsKind` | `FunctionSlot` | `NodeKind \| NodeKind[]` | The kind of `returnType.typeAnnotation` |
-| `exported` | `FunctionSlot` | `boolean` | Wrapped in `ExportNamedDeclaration` |
-| `default` | `FunctionSlot` | `boolean` | Wrapped in `ExportDefaultDeclaration` |
-| `valueKind` | `PropertySlot` | `NodeKind \| NodeKind[]` | The kind of the property's value |
-| `optional` | `PropertySlot` | `boolean` | The `optional` flag |
-| `readonly` | `PropertySlot` | `boolean` | The `readonly` flag |
-| `matches` | `LiteralSlot` | `RegExp` | The literal value |
 
 ## Cardinality
 
 | Configuration | Meaning |
 |---|---|
 | neither set | exactly 1 |
-| `minOccurs: 0` only | 0 or more |
-| `minOccurs: N` only (N ≥ 1) | N or more |
-| `maxOccurs: M` only | up to M, default min 1 |
+| `min: 0` only | 0 or more |
+| `min: N` only (N ≥ 1) | N or more |
+| `max: M` only | up to M, default min 1 |
 | both | between min and max, inclusive |
+
+`min` / `max` only apply where the matcher sits in a parent's list (e.g. a `body: [...]` element). At a singular property position they have no effect.
 
 ## Cross-position binding
 
-The same `{{NAME}}` placeholder in multiple inline expression positions unifies on the file's identifier:
+`compile` recognizes `{{NAME}}` as both a statement-level placeholder (replaced by `matchers[NAME]`) and an inline identifier placeholder (replaced by an Identifier matcher whose `name` is `{ "@bind": "NAME" }`):
 
 ```js
-body: `
+match: compile(`
   function {{NAME}}() {}
   export { {{NAME}} };
-`
+`, {}, parse),
 ```
 
-`function foo() {} export { foo };` matches. `function foo() {} export { bar };` triggers `bindingMismatch`.
+The first occurrence binds; subsequent occurrences must agree.
 
-## Supported node kinds
+## Type-safe authoring
 
-Logical kind names map to TSESTree AST `type` values:
+```ts
+import { matcher } from "eslint-plugin-templates";
+import { type TSESTree } from "@typescript-eslint/utils";
 
-| Logical kind | AST `type` |
-|---|---|
-| `ImportDeclaration` | `ImportDeclaration` |
-| `FunctionDeclaration` | `FunctionDeclaration` |
-| `ArrowFunction` | `ArrowFunctionExpression` |
-| `FunctionExpression` | `FunctionExpression` |
-| `MethodDeclaration` | `MethodDefinition` |
-| `MethodSignature` | `TSMethodSignature` |
-| `PropertyAssignment` | `Property` |
-| `PropertySignature` | `TSPropertySignature` |
-| `PropertyDeclaration` | `PropertyDefinition` |
-| `StringLiteral` | `Literal` (string value) |
-| `NumericLiteral` | `Literal` (number value) |
+const m = matcher<TSESTree.FunctionDeclaration>({
+  name: "handler",
+  match: { type: "FunctionDeclaration", async: true },
+});
+```
 
-Other kinds (`ClassDeclaration`, `TSInterfaceDeclaration`, `VariableDeclaration`, etc.) pass through the AST `type` directly via `AnySlot`.
+`matcher<N>` is a runtime no-op that asks TypeScript to narrow `match` against the chosen TSESTree node type — typos in keys fail at compile time.
 
-## Export wrappers
+## Diagnostic
 
-`{ type: "FunctionDeclaration" }` matches both `function foo() {}` and `export function foo() {}`. Filter with `exported`/`default`:
-
-| Refinement | Matches |
-|---|---|
-| no refinement | either form |
-| `exported: true` | only `export function …` (named or default) |
-| `default: true` | only `export default function …` |
-| `exported: false` | only the non-exported form |
-
-To match the wrapper itself, use `{ type: "ExportNamedDeclaration" }` via `AnySlot`.
-
-## Diagnostics
-
-| `messageId` | Message |
-|---|---|
-| `divergence` | `File diverges from template "{templateId}": expected {expected} at this position, found {found}.` |
-| `missingRequired` | `File diverges from template "{templateId}": expected at least {minOccurs} {type} node(s) for "{name}", found {found}.` |
-| `refinementFailed` | `File diverges from template "{templateId}": "{name}" expects {type} matching refinement "{refinement}".` |
-| `bindingMismatch` | `File diverges from template "{templateId}": "{name}" was bound to "{bound}" earlier but found "{got}" here.` |
-| `extraContent` | `File diverges from template "{templateId}": unexpected {found} after the last template position.` |
-| `unknownSlot` | `Template "{templateId}" references slot "{name}" that is not declared in `slots`.` |
+Single message ID: `divergence`. The diagnostic includes the template name (when set), a path into the tree, and the failure reason.
 
 ## Limitations
 
-- One template per rule invocation. Use multiple ESLint config blocks with different `files` globs to apply different templates to different parts of the codebase.
-- Cross-position binding only applies to inline placeholders. The same statement-level `{{SLOT}}` consumed twice doesn't unify; use distinct names.
+- One template per rule invocation.
 - No autofix.
 - No type-resolved checks; everything is syntactic.
 
 ## Authoring tips
 
-- Slot names must be uppercase letters, digits, and underscores (the placeholder regex is `[A-Z_][A-Z0-9_]*`).
-- The same `{{NAME}}` in multiple inline positions unifies. Use distinct names for separate slots.
+- Placeholder names must be uppercase letters, digits, and underscores: `[A-Z_][A-Z0-9_]*`.
+- The same `{{NAME}}` in multiple inline positions unifies. Use distinct names for unrelated slots.
